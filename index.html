@@ -526,23 +526,49 @@ function switchTab(tab){
 }
 function quickSelectIdiom(v){ document.getElementById('idiomInput').value=v; generateIdiomContent(); }
 
-/* ---------- 呼叫 Claude API ---------- */
-async function callClaude(systemPrompt, userText){
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:1000,
-      system: systemPrompt,
-      messages:[{role:"user", content:userText}]
-    })
-  });
+/* ---------- 呼叫萌典 API（教育部辭典，免金鑰、開放CORS） ---------- */
+async function fetchMoedict(word){
+  const res = await fetch(`https://www.moedict.tw/uni/${encodeURIComponent(word)}.json`);
+  if(!res.ok) throw new Error('查無此字詞');
   const data = await res.json();
-  const textBlock = (data.content||[]).find(b=>b.type==='text');
-  let raw = textBlock ? textBlock.text : "{}";
-  raw = raw.replace(/```json|```/g,'').trim();
-  return JSON.parse(raw);
+  return data;
+}
+function splitList(str){
+  if(!str) return [];
+  return str.split(/[、,，]/).map(s=>s.trim()).filter(Boolean);
+}
+function pickIdiomFields(data){
+  const h = (data.heteronyms||[])[0] || {};
+  const defs = h.definitions || [];
+  const firstDef = defs.find(d=>d.def) || {};
+  const example = firstDef.example && firstDef.example[0] ? firstDef.example[0] : (firstDef.quote && firstDef.quote[0]) || '';
+  let synonyms=[], antonyms=[];
+  defs.forEach(d=>{
+    if(d.synonyms) synonyms = synonyms.concat(splitList(d.synonyms));
+    if(d.antonyms) antonyms = antonyms.concat(splitList(d.antonyms));
+  });
+  return {
+    idiom: data.title || '',
+    zhuyin: h.bopomofo || h.pinyin || '',
+    meaning: (firstDef.def||'').replace(/^[0-9]+\.\s*/,''),
+    sentence: example,
+    synonyms: [...new Set(synonyms)],
+    antonyms: [...new Set(antonyms)],
+    extraSentences: defs.slice(1,3).map(d=>d.def).filter(Boolean)
+  };
+}
+async function getCharBreakdown(chars){
+  const uniqueChars = [...new Set(chars.split(''))];
+  const results = await Promise.all(uniqueChars.map(async c=>{
+    try{
+      const data = await fetchMoedict(c);
+      const h = (data.heteronyms||[])[0] || {};
+      const def = (h.definitions||[]).find(d=>d.def);
+      return {char:c, zhuyin:h.bopomofo||'', meaning: def ? def.def.slice(0,10) : ''};
+    }catch(e){ return {char:c, zhuyin:'', meaning:''}; }
+  }));
+  const map = {}; results.forEach(r=>map[r.char]=r);
+  return chars.split('').map(c=>map[c]);
 }
 
 /* ---------- 生成小插畫 (簡易 SVG) ---------- */
@@ -594,10 +620,11 @@ async function generateIdiomContent(){
     } else if(prebuiltFullData[idiom]){
       d = {idiom, breakdown:[], comic:[], ...JSON.parse(JSON.stringify(prebuiltFullData[idiom]))};
     } else {
-      const systemPrompt = `你是台灣國小國語老師，專門把成語改編成適合兒童的4格漫畫故事。只回傳精簡JSON(不要markdown、不要多餘空白)：
-{"idiom":"成語","zhuyin":"注音(用空格分隔每字)","breakdown":[{"char":"字","zhuyin":"注音","meaning":"意思(6字內)"}],"meaning":"引申義(20字內)","comic":[{"step":"1","desc":"情境描述(15字內，像繪本旁白)"}],"synonyms":["近義詞1","近義詞2"],"antonyms":["反義詞1","反義詞2"],"sentence":"生活化造句","extraSentences":["延伸例句1","延伸例句2"]}
-comic陣列請剛好4格，依故事順序描述。`;
-      d = await callClaude(systemPrompt, `成語：${idiom}`);
+      const moe = await fetchMoedict(idiom);
+      d = pickIdiomFields(moe);
+      d.breakdown = await getCharBreakdown(idiom);
+      d.comic = [];
+      d.noComic = true;
     }
     d.grade=grade; d.lesson=lesson; d.type='idiom';
     currentIdiomData = d;
@@ -632,16 +659,11 @@ comic陣列請剛好4格，依故事順序描述。`;
         </div>
       </div>`;
     } else {
-      cm.className = "grid grid-cols-2 sm:grid-cols-4 gap-3";
-      const palette = ['#FF6F5E','#FFC845','#5FAE7F','#4FA3C4'];
-      cm.innerHTML='';
-      (d.comic||[]).forEach((f,i)=>{
-        cm.innerHTML += `<div class="crayon-border bg-white p-2 ${i%2? 'wobble-r':'wobble-l'} relative">
-          <div class="tape -top-2 left-1/2 -translate-x-1/2"></div>
-          ${doodleFor(i,palette)}
-          <div class="text-xs mt-1 font-bold text-center">${i+1}. ${f.desc}</div>
-        </div>`;
-      });
+      cm.className = "grid grid-cols-1";
+      cm.innerHTML = `<div class="crayon-border bg-white p-6 text-center wobble-l">
+        <div class="text-4xl mb-2">🖍️</div>
+        <p class="text-sm">這個成語還沒有漫畫圖！<br>可以到「➕ 新增圖卡」分頁，把你自己生成或找到的圖片加進來。</p>
+      </div>`;
     }
 
     document.getElementById('cardSynonyms').innerHTML = (d.synonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
@@ -653,7 +675,7 @@ comic陣列請剛好4格，依故事順序描述。`;
     document.getElementById('cardResult').classList.remove('hidden');
   }catch(e){
     document.getElementById('loadingIdiom').classList.add('hidden');
-    alert('生成失敗，請稍後再試。');
+    alert('查無此成語，請確認輸入是否正確，或稍後再試一次。');
   }
 }
 
@@ -667,11 +689,28 @@ async function fetchVocabDetails(){
   document.getElementById('loadingVocab').classList.remove('hidden');
   document.getElementById('vocabResult').classList.add('hidden');
 
-  const systemPrompt = `你是台灣國小國語字典。只回傳精簡JSON(不要markdown)：
-{"char":"字","zhuyin":"注音","radical":"部首與筆畫","words":["詞1","詞2","詞3"],"synonyms":["近義字1","近義字2"],"antonyms":["反義字1","反義字2"],"sentence1":"造句1","sentence2":"造句2","extraSentences":["延伸例句1","延伸例句2"]}`;
-
   try{
-    const d = await callClaude(systemPrompt, `生字：${vocab}`);
+    const moe = await fetchMoedict(vocab);
+    const h = (moe.heteronyms||[])[0] || {};
+    const defs = h.definitions || [];
+    const wordDefs = defs.filter(d=>d.def);
+    let synonyms=[], antonyms=[];
+    defs.forEach(dd=>{
+      if(dd.synonyms) synonyms = synonyms.concat(splitList(dd.synonyms));
+      if(dd.antonyms) antonyms = antonyms.concat(splitList(dd.antonyms));
+    });
+    const examples = wordDefs.map(dd=> (dd.example&&dd.example[0]) || (dd.quote&&dd.quote[0]) ).filter(Boolean);
+    const d = {
+      char: moe.title || vocab,
+      zhuyin: h.bopomofo || h.pinyin || '',
+      radical: (moe.radical ? `部首：${moe.radical}` : '') + (moe.stroke_count ? ` (${moe.stroke_count}劃)` : ''),
+      words: [],
+      synonyms: [...new Set(synonyms)],
+      antonyms: [...new Set(antonyms)],
+      sentence1: examples[0] || (wordDefs[0]&&wordDefs[0].def) || '',
+      sentence2: examples[1] || (wordDefs[1]&&wordDefs[1].def) || '',
+      extraSentences: []
+    };
     d.grade=grade; d.lesson=lesson; d.type='vocab';
     currentVocabData = d;
 
@@ -681,7 +720,7 @@ async function fetchVocabDetails(){
     document.getElementById('vRadical').innerText = d.radical;
     document.getElementById('vSent1').innerText = d.sentence1;
     document.getElementById('vSent2').innerText = d.sentence2;
-    document.getElementById('vWords').innerHTML = (d.words||[]).map(w=>`<span onclick="speak('${w}')" class="crayon-border bg-white px-3 py-1 text-sm cursor-pointer">${w} 🔊</span>`).join('');
+    document.getElementById('vWords').innerHTML = (d.words||[]).map(w=>`<span onclick="speak('${w}')" class="crayon-border bg-white px-3 py-1 text-sm cursor-pointer">${w} 🔊</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（辭典未提供常用語詞）</span>';
     document.getElementById('vSynonyms').innerHTML = (d.synonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
     document.getElementById('vAntonyms').innerHTML = (d.antonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
     document.getElementById('vExtra').innerHTML = (d.extraSentences||[]).map(s=>`<li>${s}</li>`).join('');
@@ -690,7 +729,7 @@ async function fetchVocabDetails(){
     document.getElementById('vocabResult').classList.remove('hidden');
   }catch(e){
     document.getElementById('loadingVocab').classList.add('hidden');
-    alert('查詢生字失敗。');
+    alert('查無此生字，請確認輸入是否正確。');
   }
 }
 
