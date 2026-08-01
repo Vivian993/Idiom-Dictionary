@@ -70,6 +70,7 @@
     <p class="text-[color:var(--ink)]/70 font-medium">成語變漫畫、生字會說話！1-6年級 · 12課自由歸檔</p>
   </header>
 
+  <div class="sticky top-0 z-20 bg-[color:var(--cream)] -mx-4 px-4 sm:-mx-8 sm:px-8 pt-2 pb-1">
   <div class="flex justify-center gap-2 no-print">
     <button onclick="switchTab('idiom')" id="tabIdiom" class="tab-btn px-6 py-3 font-bold display text-lg bg-[color:var(--coral)] text-white">
       📖 成語漫畫解說
@@ -80,6 +81,7 @@
     <button onclick="switchTab('manage')" id="tabManage" class="tab-btn px-6 py-3 font-bold display text-lg bg-white text-[color:var(--ink)]">
       ➕ 新增圖卡
     </button>
+  </div>
   </div>
 
   <!-- ============ 成語面板 ============ -->
@@ -119,6 +121,8 @@
         <button onclick="saveIdiomToLibrary()" class="no-print btn-doodle bg-[color:var(--green)] text-white px-4 py-2 font-bold shrink-0">📥 收藏</button>
       </div>
 
+      <button onclick="prefillManageForm()" class="no-print btn-doodle w-full py-2.5 font-bold bg-[color:var(--purple)]/80 text-white text-sm">📌 用這筆資料建立圖卡(只需再上傳圖片)</button>
+
       <div>
         <h4 class="display text-lg text-[color:var(--blue)] mb-2">🔍 字面拆解（點字聽發音）</h4>
         <div id="cardBreakdown" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
@@ -151,17 +155,23 @@
   <!-- ============ 新增圖卡管理面板 ============ -->
   <div id="panelManage" class="panel -mt-1 p-6 sm:p-8 space-y-6 hidden">
     <div class="crayon-border bg-[color:var(--blue)]/15 p-4">
-      <h3 class="display text-xl mb-3">📅 課程名稱設定</h3>
-      <p class="text-sm mb-3">幫每個年級輸入這學期實際的 12 課課名,之後下拉選單就會直接顯示(例如「第一課 蚊帳大使」)。每個年級分開儲存,換年級、換學期都可以重新設定。</p>
-      <select id="lessonSetupGrade" onchange="loadLessonSetupForm()" class="px-3 py-2 crayon-border bg-white mb-3">
-        <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
-      </select>
-      <div id="lessonNameInputs" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3"></div>
-      <button onclick="saveLessonNames()" class="btn-doodle bg-[color:var(--blue)] text-white font-bold px-4 py-2 text-sm">💾 儲存這個年級的課名</button>
+      <button onclick="toggleLessonSetup()" class="w-full flex justify-between items-center">
+        <h3 class="display text-xl">📅 課程名稱設定</h3>
+        <span id="lessonSetupArrow" class="text-2xl">▼</span>
+      </button>
+      <div id="lessonSetupBody" class="hidden mt-3">
+        <p class="text-sm mb-3">幫每個年級輸入這學期實際的 12 課課名,之後下拉選單就會直接顯示(例如「第一課 蚊帳大使」)。每個年級分開儲存,換年級、換學期都可以重新設定。</p>
+        <select id="lessonSetupGrade" onchange="loadLessonSetupForm()" class="px-3 py-2 crayon-border bg-white mb-3">
+          <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
+        </select>
+        <div id="lessonNameInputs" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3"></div>
+        <button onclick="saveLessonNames()" class="btn-doodle bg-[color:var(--blue)] text-white font-bold px-4 py-2 text-sm">💾 儲存這個年級的課名</button>
+      </div>
     </div>
 
     <div class="crayon-border bg-[color:var(--yellow)]/15 p-4 text-sm">
       💡 在這裡把你用 Gemini(或其他工具)生成好的成語漫畫圖上傳,系統會自動壓縮圖片並存進辭典裡。之後查詢這個成語時,就會直接顯示你上傳的圖!
+      <p id="storageUsageText" class="mt-2 font-bold text-[color:var(--purple)]"></p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -350,6 +360,14 @@ function refreshLessonDropdown(gradeSelectId, lessonSelectId){
   const grade = document.getElementById(gradeSelectId).value;
   document.getElementById(lessonSelectId).innerHTML = buildLessonOptions(grade);
 }
+function toggleLessonSetup(){
+  const body = document.getElementById('lessonSetupBody');
+  const arrow = document.getElementById('lessonSetupArrow');
+  const willShow = body.classList.contains('hidden');
+  body.classList.toggle('hidden');
+  arrow.innerText = willShow ? '▲' : '▼';
+  if(willShow) loadLessonSetupForm();
+}
 function loadLessonSetupForm(){
   const grade = document.getElementById('lessonSetupGrade').value;
   const existing = lessonNames[grade] || [];
@@ -376,7 +394,80 @@ function saveLessonNames(){
     }
   });
 }
-let userLibrary = JSON.parse(localStorage.getItem('idiom_vocab_userImages_v1')||'{}');
+/* ---------- IndexedDB 儲存(取代localStorage，容量大很多) ---------- */
+const IDB_NAME='idiomDictDB', IDB_STORE='userIdioms';
+let idbPromise=null;
+function openIDB(){
+  if(idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve,reject)=>{
+    const req = indexedDB.open(IDB_NAME,1);
+    req.onupgradeneeded = e=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE,{keyPath:'idiom'});
+    };
+    req.onsuccess = e=>resolve(e.target.result);
+    req.onerror = e=>reject(e.target.error);
+  });
+  return idbPromise;
+}
+async function idbGetAll(){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readonly');
+    const req = tx.objectStore(IDB_STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result||[]);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function idbPut(record){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put(record);
+    tx.oncomplete = resolve;
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function idbDelete(idiom){
+  const db = await openIDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(idiom);
+    tx.oncomplete = resolve;
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+let userLibrary = {};
+async function loadUserLibrary(){
+  // 搬移舊版 localStorage 資料(如果有)進 IndexedDB，搬完就清掉舊資料
+  const oldRaw = localStorage.getItem('idiom_vocab_userImages_v1');
+  if(oldRaw){
+    try{
+      const old = JSON.parse(oldRaw);
+      for(const k of Object.keys(old)){
+        await idbPut({idiom:k, ...old[k]});
+      }
+      localStorage.removeItem('idiom_vocab_userImages_v1');
+    }catch(e){}
+  }
+  const all = await idbGetAll();
+  userLibrary = {};
+  all.forEach(r=>{ const {idiom, ...rest} = r; userLibrary[idiom] = rest; });
+}
+async function updateStorageUsage(){
+  const el = document.getElementById('storageUsageText');
+  if(!el) return;
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const {usage, quota} = await navigator.storage.estimate();
+      const mb = (usage/1024/1024).toFixed(1);
+      const qMb = (quota/1024/1024).toFixed(0);
+      el.innerText = `已使用空間：約 ${mb} MB / ${qMb} MB`;
+    } else {
+      el.innerText = '';
+    }
+  }catch(e){ el.innerText=''; }
+}
 
 /* ---------- 圖片壓縮(上傳前自動處理) ---------- */
 function compressImage(file, maxDim=1000, quality=0.82){
@@ -422,7 +513,7 @@ async function saveUserIdiom(){
     dataUrl = compressed.dataUrl;
   }
 
-  userLibrary[idiom] = {
+  const newRecord = {
     zhuyin: document.getElementById('mZhuyin').value.trim(),
     meaning: document.getElementById('mMeaning').value.trim(),
     synonyms: document.getElementById('mSynonyms').value.split('、').map(s=>s.trim()).filter(Boolean),
@@ -432,14 +523,16 @@ async function saveUserIdiom(){
     singleImage: dataUrl
   };
   try{
-    localStorage.setItem('idiom_vocab_userImages_v1', JSON.stringify(userLibrary));
+    await idbPut({idiom, ...newRecord});
+    userLibrary[idiom] = newRecord;
     alert(`「${idiom}」圖卡已儲存！之後查詢這個成語就會顯示這張圖。`);
     ['mIdiom','mZhuyin','mMeaning','mSynonyms','mAntonyms','mSentence'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('mImageFile').value='';
     document.getElementById('mPreview').classList.add('hidden');
     renderUserLibraryList();
+    updateStorageUsage();
   }catch(e){
-    alert('儲存失敗，可能是圖片太多超過瀏覽器儲存空間限制。可以試著刪除一些舊圖卡。');
+    alert('儲存失敗，請稍後再試，或聯繫協助排查。');
   }
 }
 
@@ -462,11 +555,12 @@ function renderUserLibraryList(){
   `).join('');
 }
 
-function deleteUserIdiom(idiom){
+async function deleteUserIdiom(idiom){
   if(!confirm(`確定要刪除「${idiom}」的圖卡嗎？`)) return;
+  await idbDelete(idiom);
   delete userLibrary[idiom];
-  localStorage.setItem('idiom_vocab_userImages_v1', JSON.stringify(userLibrary));
   renderUserLibraryList();
+  updateStorageUsage();
 }
 let savedLibrary = JSON.parse(localStorage.getItem('idiom_vocab_library_v3')||'[]');
 ['idiomLesson','vocabLesson'].forEach(id=>{
@@ -522,7 +616,7 @@ function switchTab(tab){
     }
   });
   if(tab==='vocab') renderLibrary();
-  if(tab==='manage'){ renderUserLibraryList(); loadLessonSetupForm(); }
+  if(tab==='manage'){ renderUserLibraryList(); loadLessonSetupForm(); updateStorageUsage(); }
 }
 function quickSelectIdiom(v){ document.getElementById('idiomInput').value=v; generateIdiomContent(); }
 
@@ -734,6 +828,19 @@ async function fetchVocabDetails(){
 }
 
 /* ---------- 收藏庫 ---------- */
+function prefillManageForm(){
+  if(!currentIdiomData) return;
+  const d = currentIdiomData;
+  switchTab('manage');
+  document.getElementById('mIdiom').value = d.idiom || '';
+  document.getElementById('mZhuyin').value = d.zhuyin || '';
+  document.getElementById('mMeaning').value = d.meaning || '';
+  document.getElementById('mSynonyms').value = (d.synonyms||[]).join('、');
+  document.getElementById('mAntonyms').value = (d.antonyms||[]).join('、');
+  document.getElementById('mSentence').value = d.sentence || '';
+  document.getElementById('mImageFile').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
 function saveIdiomToLibrary(){
   if(!currentIdiomData) return;
   savedLibrary.push(currentIdiomData);
@@ -791,7 +898,8 @@ function clearLibrary(){
   }
 }
 
-window.onload = function(){
+window.onload = async function(){
+  await loadUserLibrary();
   document.getElementById('idiomInput').value = "守株待兔";
   generateIdiomContent();
 };
