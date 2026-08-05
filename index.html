@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小樹苗國語文故事辭典</title>
-<!-- 📌 iPhone 桌面 App 圖示：它會去抓您上傳到 GitHub 的 custom-icon.png 照片 -->  <link rel="apple-touch-icon" href="custom-icon.png">
-<link rel="icon" type="image/png" href="custom-icon.png">  
+
+<!-- 📌 iPhone 桌面 App 圖示 -->
+<link rel="apple-touch-icon" href="custom-icon.png">
+<link rel="icon" type="image/png" href="custom-icon.png">
+
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -27,8 +30,6 @@
     color:var(--ink);
   }
   .display{font-family:'ZCOOL KuaiLe',cursive;}
-  .wobble-r{transform:rotate(1.2deg);}
-  .wobble-l{transform:rotate(-1.4deg);}
   .crayon-border{
     border:3px solid var(--ink);
     border-radius: 255px 18px 225px 18px/18px 225px 18px 255px;
@@ -36,6 +37,7 @@
   .tape{
     position:absolute; width:70px; height:24px; background:rgba(255,200,69,0.55);
     border:1px solid rgba(74,55,40,0.25);
+    z-index: 10;
   }
   .panel{
     background:var(--paper);
@@ -48,6 +50,7 @@
     border-radius:14px;
     box-shadow:3px 3px 0 var(--ink);
     transition: transform .08s ease;
+    cursor: pointer;
   }
   .btn-doodle:active{ transform: translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
   .tab-btn{
@@ -55,13 +58,42 @@
     border-radius:16px 16px 0 0;
   }
   ruby rt{ font-size:0.55em; color:var(--purple); font-weight:700; }
-  @media print{
-    .no-print{display:none!important;}
-    body{background:white!important;}
-    .panel{box-shadow:none!important;}
-  }
+  
   ::-webkit-scrollbar{height:8px;width:8px;}
   ::-webkit-scrollbar-thumb{background:#d9c092;border-radius:8px;}
+
+  /* A4 直式列印規範 */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  @media print{
+    .no-print{display:none!important;}
+    body{background:white!important; background-image:none!important;}
+    .panel{box-shadow:none!important; border:none!important;}
+    
+    body.print-mode-quiz * { visibility: hidden; }
+    body.print-mode-quiz #printQuizArea, body.print-mode-quiz #printQuizArea * { visibility: visible; }
+    body.print-mode-quiz #printQuizArea { position: absolute; left: 0; top: 0; width: 100%; }
+
+    body.print-mode-idiom * { visibility: hidden; }
+    body.print-mode-idiom #cardResult, body.print-mode-idiom #cardResult * { visibility: visible; }
+    body.print-mode-idiom #cardResult { position: absolute; left: 0; top: 0; width: 100%; }
+
+    body.print-mode-manage * { visibility: hidden; }
+    body.print-mode-manage #panelManage, body.print-mode-manage #panelManage * { visibility: visible; }
+    body.print-mode-manage #panelManage { position: absolute; left: 0; top: 0; width: 100%; background: white !important; }
+    body.print-mode-manage .lib-detail-box { display: block !important; }
+    body.print-mode-manage button { display: none !important; }
+    
+    .library-card-item {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      margin-bottom: 15px !important;
+      border: 2px solid #4A3728 !important;
+    }
+  }
 </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
@@ -69,334 +101,246 @@
 
   <header class="text-center mb-8 no-print">
     <h1 class="display text-4xl sm:text-5xl text-[color:var(--coral)] mb-2">🌱 小樹苗國語文故事辭典</h1>
-    <p class="text-[color:var(--ink)]/70 font-medium">成語變漫畫、生字會說話！1-6年級 · 12課自由歸檔</p>
+    <p class="text-[color:var(--ink)]/70 font-medium">成語變漫畫、生字會說話！你的國語好幫手 📚</p>
   </header>
 
   <div class="sticky top-0 z-20 bg-[color:var(--cream)] -mx-4 px-4 sm:-mx-8 sm:px-8 pt-2 pb-1">
-  <div class="flex justify-center gap-2 no-print">
-    <button onclick="switchTab('idiom')" id="tabIdiom" class="tab-btn px-6 py-3 font-bold display text-lg bg-[color:var(--coral)] text-white">
-      📖 成語漫畫解說
-    </button>
-    <button onclick="switchTab('vocab')" id="tabVocab" class="tab-btn px-6 py-3 font-bold display text-lg bg-white text-[color:var(--ink)]">
-      🔤 生字小字典
-    </button>
-    <button onclick="switchTab('manage')" id="tabManage" class="tab-btn px-6 py-3 font-bold display text-lg bg-white text-[color:var(--ink)]">
-      ➕ 新增圖卡
-    </button>
+  <div class="flex justify-center gap-2 flex-wrap no-print">
+    <button onclick="switchTab('idiom')" id="tabIdiom" class="tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-[color:var(--coral)] text-white">📖 成語圖說</button>
+    <button onclick="switchTab('vocab')" id="tabVocab" class="tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-white text-[color:var(--ink)]">🔤 生字字典</button>
+    <button onclick="switchTab('quiz')" id="tabQuiz" class="tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-white text-[color:var(--ink)]">📝 測驗遊戲</button>
+    <button onclick="switchTab('manage')" id="tabManage" class="tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-white text-[color:var(--ink)]">⚙️ 圖卡管理</button>
   </div>
   </div>
 
   <!-- ============ 成語面板 ============ -->
   <div id="panelIdiom" class="panel -mt-1 p-6 sm:p-8 space-y-6">
     <div class="no-print grid grid-cols-1 sm:grid-cols-4 gap-3">
-      <input id="idiomInput" placeholder="輸入成語，例如：守株待兔" class="sm:col-span-2 px-4 py-3 crayon-border text-lg bg-white focus:outline-none">
-      <select id="idiomGrade" class="px-3 py-3 crayon-border bg-white">
+      <input id="idiomInput" placeholder="輸入成語，例如：守株待兔" class="sm:col-span-2 px-4 py-3 crayon-border text-lg bg-white focus:outline-none focus:ring-2 focus:ring-[color:var(--yellow)]">
+      <select id="idiomGrade" class="px-3 py-3 crayon-border bg-white focus:outline-none">
         <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
       </select>
-      <select id="idiomLesson" class="px-3 py-3 crayon-border bg-white"></select>
+      <select id="idiomLesson" class="px-3 py-3 crayon-border bg-white focus:outline-none"></select>
     </div>
-    <button onclick="generateIdiomContent()" class="no-print btn-doodle w-full py-3 font-bold display text-xl bg-[color:var(--yellow)]">✏️ 畫出成語漫畫！</button>
-    <div class="no-print flex flex-wrap gap-2 text-sm items-center">
-      <span class="font-bold">快速嘗試：</span>
-      <button onclick="quickSelectIdiom('守株待兔')" class="btn-doodle bg-[color:var(--yellow)]/40 px-3 py-1">🖼️ 守株待兔</button>
-      <button onclick="quickSelectIdiom('畫龍點睛')" class="btn-doodle bg-[color:var(--yellow)]/40 px-3 py-1">🖼️ 畫龍點睛</button>
-      <button onclick="quickSelectIdiom('掩耳盜鈴')" class="btn-doodle bg-[color:var(--yellow)]/40 px-3 py-1">🖼️ 掩耳盜鈴</button>
-      <button onclick="quickSelectIdiom('驚慌失措')" class="btn-doodle bg-[color:var(--coral)]/25 px-3 py-1">🎨 驚慌失措</button>
-      <button onclick="quickSelectIdiom('杯弓蛇影')" class="btn-doodle bg-[color:var(--coral)]/25 px-3 py-1">🎨 杯弓蛇影</button>
-    </div>
-
+    <button onclick="generateIdiomContent()" class="no-print btn-doodle w-full py-3 font-bold display text-xl bg-[color:var(--yellow)] hover:bg-[#ffcf61]">🔍 查成語！</button>
+    
     <div id="loadingIdiom" class="hidden text-center py-12 no-print">
-      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-[color:var(--coral)] border-t-transparent"></div>
-      <p class="mt-3 font-bold display text-lg">小畫家正在畫漫畫中...🖍️</p>
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[color:var(--coral)] border-t-transparent"></div>
+      <p class="mt-4 font-bold display text-xl text-[color:var(--coral)]">小樹苗正在翻閱辭典... 📖</p>
     </div>
 
-    <div id="cardResult" class="hidden space-y-6">
+    <div id="cardResult" class="hidden space-y-6 relative">
       <div class="crayon-border bg-[color:var(--coral)]/10 p-5 flex justify-between items-start">
         <div>
           <div id="cardMeta" class="text-xs font-bold text-[color:var(--purple)]"></div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <h2 id="cardTitle" class="display text-4xl text-[color:var(--coral)]"></h2>
-            <button onclick="speak(currentIdiomData.idiom)" class="no-print text-2xl">🔊</button>
+          <div class="flex items-center gap-3 flex-wrap mt-1">
+            <h2 id="cardTitle" class="display text-4xl sm:text-5xl text-[color:var(--coral)]"></h2>
+            <button onclick="speak(currentIdiomData.idiom)" class="no-print text-3xl hover:scale-110 transition-transform">🔊</button>
           </div>
-          <p id="cardZhuyin" class="text-lg text-[color:var(--purple)] font-bold"></p>
+          <p id="cardZhuyin" class="text-lg text-[color:var(--purple)] font-bold mt-1"></p>
         </div>
-        <button onclick="saveIdiomToLibrary()" class="no-print btn-doodle bg-[color:var(--green)] text-white px-4 py-2 font-bold shrink-0">📥 收藏</button>
+        <div class="flex gap-2 flex-col sm:flex-row">
+            <button onclick="printIdiom()" class="no-print btn-doodle bg-white text-[color:var(--ink)] px-4 py-2 font-bold shrink-0">🖨️ 列印此頁</button>
+            <button onclick="saveIdiomToLibrary()" class="no-print btn-doodle bg-[color:var(--green)] text-white px-4 py-2 font-bold shrink-0">📥 收藏</button>
+        </div>
       </div>
 
-      <button onclick="prefillManageForm()" class="no-print btn-doodle w-full py-2.5 font-bold bg-[color:var(--purple)]/80 text-white text-sm">📌 用這筆資料建立圖卡(只需再上傳圖片)</button>
-
       <div>
-        <h4 class="display text-lg text-[color:var(--blue)] mb-2">🔍 字面拆解（點字聽發音）</h4>
+        <h4 class="display text-xl text-[color:var(--blue)] mb-3">🔍 字面拆解</h4>
         <div id="cardBreakdown" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
       </div>
 
+      <!-- 成語情境圖卡區 -->
       <div>
-        <h4 class="display text-lg text-[color:var(--coral)] mb-2">🎬 成語小漫畫</h4>
-        <div id="cardComicGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+        <h4 class="display text-xl text-[color:var(--coral)] mb-3">🎬 成語情境圖卡</h4>
+        <div id="cardComicGrid" class="w-full">
+           <div class="crayon-border bg-white p-6 text-center">
+              <p class="text-sm font-bold text-[color:var(--ink)]/70 mb-3">您可以上傳自製的成語水彩插圖，或直接參考下方詳細解析！</p>
+              <input type="file" id="idiomImageUpload" accept="image/*" class="text-sm" onchange="uploadIdiomImage(event)">
+           </div>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="crayon-border bg-[color:var(--green)]/10 p-4">
-          <h4 class="display text-[color:var(--green)] mb-1">👍 近義詞</h4>
+          <h4 class="display text-lg text-[color:var(--green)] mb-2">👍 近義詞</h4>
           <div id="cardSynonyms" class="flex flex-wrap gap-2"></div>
         </div>
         <div class="crayon-border bg-[color:var(--blue)]/10 p-4">
-          <h4 class="display text-[color:var(--blue)] mb-1">👎 反義詞</h4>
+          <h4 class="display text-lg text-[color:var(--blue)] mb-2">👎 反義詞</h4>
           <div id="cardAntonyms" class="flex flex-wrap gap-2"></div>
         </div>
       </div>
 
-      <div class="crayon-border bg-[color:var(--yellow)]/15 p-4">
-        <h4 class="display text-[color:var(--ink)] mb-1">✍️ 生活造句與延伸例句</h4>
-        <p id="cardSentence" class="font-medium mb-2"></p>
+      <div class="crayon-border bg-[color:var(--yellow)]/20 p-5">
+        <h4 class="display text-xl text-[color:var(--ink)] mb-2">✍️ 意思與造句</h4>
+        <p id="cardMeaning" class="font-bold text-[color:var(--ink)] mb-3 p-3 bg-white/60 rounded-xl"></p>
+        <p id="cardSentence" class="font-medium mb-2 leading-relaxed text-lg bg-white/60 p-3 rounded-xl border border-dashed border-[color:var(--ink)]/30"></p>
         <ul id="cardExtra" class="list-disc list-inside text-sm text-[color:var(--ink)]/80 space-y-1"></ul>
       </div>
-    </div>
-  </div>
-
-  <!-- ============ 新增圖卡管理面板 ============ -->
-  <div id="panelManage" class="panel -mt-1 p-6 sm:p-8 space-y-6 hidden">
-    <div class="crayon-border bg-[color:var(--blue)]/15 p-4">
-      <button onclick="toggleLessonSetup()" class="w-full flex justify-between items-center">
-        <h3 class="display text-xl">📅 課程名稱設定</h3>
-        <span id="lessonSetupArrow" class="text-2xl">▼</span>
-      </button>
-      <div id="lessonSetupBody" class="hidden mt-3">
-        <p class="text-sm mb-3">幫每個年級輸入這學期實際的 12 課課名,之後下拉選單就會直接顯示(例如「第一課 蚊帳大使」)。每個年級分開儲存,換年級、換學期都可以重新設定。</p>
-        <select id="lessonSetupGrade" onchange="loadLessonSetupForm()" class="px-3 py-2 crayon-border bg-white mb-3">
-          <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
-        </select>
-        <div id="lessonNameInputs" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3"></div>
-        <button onclick="saveLessonNames()" class="btn-doodle bg-[color:var(--blue)] text-white font-bold px-4 py-2 text-sm">💾 儲存這個年級的課名</button>
-      </div>
-    </div>
-
-    <div class="crayon-border bg-[color:var(--yellow)]/15 p-4 text-sm">
-      💡 在這裡把你用 Gemini(或其他工具)生成好的成語漫畫圖上傳,系統會自動壓縮圖片並存進辭典裡。之後查詢這個成語時,就會直接顯示你上傳的圖!
-      <p id="storageUsageText" class="mt-2 font-bold text-[color:var(--purple)]"></p>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label class="text-sm font-bold block mb-1">成語名稱 *</label>
-        <input id="mIdiom" placeholder="例如：畫龍點睛" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none">
-      </div>
-      <div>
-        <label class="text-sm font-bold block mb-1">注音</label>
-        <input id="mZhuyin" placeholder="ㄏㄨㄚˋ ㄌㄨㄥˊ ㄉㄧㄢˇ ㄐㄧㄥ" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none">
-      </div>
-    </div>
-    <div>
-      <label class="text-sm font-bold block mb-1">意思</label>
-      <textarea id="mMeaning" rows="2" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none"></textarea>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label class="text-sm font-bold block mb-1">近義詞(用、分隔)</label>
-        <input id="mSynonyms" placeholder="錦上添花、點石成金" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none">
-      </div>
-      <div>
-        <label class="text-sm font-bold block mb-1">反義詞(用、分隔)</label>
-        <input id="mAntonyms" placeholder="畫蛇添足、弄巧成拙" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none">
-      </div>
-    </div>
-    <div>
-      <label class="text-sm font-bold block mb-1">造句</label>
-      <textarea id="mSentence" rows="2" class="w-full px-4 py-3 crayon-border bg-white focus:outline-none"></textarea>
-    </div>
-    <div>
-      <label class="text-sm font-bold block mb-1">上傳圖片 *(會自動壓縮)</label>
-      <input id="mImageFile" type="file" accept="image/*" class="w-full px-4 py-3 crayon-border bg-white">
-      <div id="mPreview" class="mt-3 hidden">
-        <img id="mPreviewImg" class="max-w-xs rounded-xl crayon-border">
-        <p id="mPreviewInfo" class="text-xs mt-1 text-[color:var(--ink)]/60"></p>
-      </div>
-    </div>
-    <button onclick="saveUserIdiom()" class="btn-doodle w-full py-3 font-bold display text-xl bg-[color:var(--green)] text-white">💾 儲存這張圖卡</button>
-
-    <div class="pt-4 border-t-2 border-dashed border-[color:var(--ink)]/30">
-      <h3 class="display text-xl mb-3">📚 已新增的圖卡</h3>
-      <div id="userLibraryList" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
     </div>
   </div>
 
   <!-- ============ 生字面板 ============ -->
   <div id="panelVocab" class="panel -mt-1 p-6 sm:p-8 space-y-6 hidden">
     <div class="no-print grid grid-cols-1 sm:grid-cols-5 gap-3">
-      <input id="vocabInput" placeholder="輸入單一漢字，例如：毫" class="sm:col-span-2 px-4 py-3 crayon-border text-lg bg-white focus:outline-none">
+      <input id="vocabInput" placeholder="輸入單字，或貼上整課生字" class="sm:col-span-2 px-4 py-3 crayon-border text-lg bg-white focus:outline-none focus:ring-2 focus:ring-[color:var(--yellow)]">
       <select id="vocabGrade" class="px-3 py-3 crayon-border bg-white">
         <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
       </select>
       <select id="vocabLesson" class="px-3 py-3 crayon-border bg-white"></select>
-      <button onclick="fetchVocabDetails()" class="btn-doodle bg-[color:var(--yellow)] font-bold display">查字典</button>
+      <button onclick="fetchBatchVocab()" class="btn-doodle bg-[color:var(--yellow)] font-bold display text-lg">🔍 查生字</button>
     </div>
+    <p class="text-xs text-[color:var(--ink)]/60 no-print -mt-3">💡 提示：輸入多個字系統會自動過濾重複並建立「生字卡列」，點擊卡片即可檢視完整解析！</p>
 
     <div id="loadingVocab" class="hidden text-center py-8 no-print">
-      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[color:var(--coral)] border-t-transparent"></div>
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-[color:var(--coral)] border-t-transparent"></div>
+      <p id="loadingVocabText" class="mt-2 text-[color:var(--coral)] font-bold">正在查詢中...</p>
+    </div>
+
+    <div id="vocabBatchArea" class="hidden no-print mb-4">
+        <div class="flex justify-between items-center mb-2">
+            <h4 class="display text-lg text-[color:var(--ink)]">📚 本次查詢生字卡列</h4>
+            <button onclick="saveAllBatchToLibrary()" class="btn-doodle bg-[color:var(--green)] text-white px-3 py-1 text-sm font-bold">💾 一鍵收藏整列生字</button>
+        </div>
+        <div id="vocabTabs" class="flex flex-wrap gap-2 bg-white/50 p-2 rounded-xl border-2 border-dashed border-[color:var(--ink)]/20"></div>
     </div>
 
     <div id="vocabResult" class="hidden space-y-4">
       <div class="crayon-border bg-[color:var(--purple)]/10 p-5 flex justify-between items-center flex-wrap gap-3">
         <div class="flex items-center gap-4">
-          <div id="vChar" class="w-16 h-16 bg-[color:var(--purple)] text-white rounded-2xl flex items-center justify-center text-3xl display shrink-0"></div>
+          <div id="vChar" class="w-20 h-20 bg-[color:var(--purple)] text-white rounded-2xl flex items-center justify-center text-5xl display shrink-0 shadow-inner"></div>
           <div>
             <div id="vMeta" class="text-xs font-bold text-[color:var(--purple)]"></div>
-            <div class="flex items-center gap-2">
-              <h2 id="vZhuyin" class="text-lg font-bold"></h2>
-              <button onclick="speak(currentVocabData.char)" class="no-print text-xl">🔊</button>
+            <div class="flex items-center gap-2 mt-1">
+              <h2 id="vZhuyin" class="text-2xl font-bold"></h2>
+              <button onclick="speak(currentVocabData.char)" class="no-print text-2xl hover:scale-110">🔊</button>
             </div>
           </div>
         </div>
-        <div class="flex gap-2 no-print">
+        <div class="flex flex-col items-end gap-2 no-print">
           <span id="vRadical" class="bg-white px-3 py-1.5 rounded-lg text-sm font-medium crayon-border"></span>
-          <button onclick="saveVocabToLibrary()" class="btn-doodle bg-[color:var(--green)] text-white px-4 py-1.5 font-bold text-sm">💾 收藏</button>
+          <button onclick="saveVocabToLibrary()" class="btn-doodle bg-white text-[color:var(--ink)] px-4 py-1.5 font-bold text-sm">單獨收藏此字</button>
         </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="crayon-border bg-white p-4">
-          <h4 class="display text-[color:var(--blue)] mb-2">常用語詞</h4>
-          <div id="vWords" class="flex flex-wrap gap-2"></div>
+        <div class="crayon-border bg-white p-5">
+          <h4 class="display text-xl text-[color:var(--blue)] mb-3">📖 詳細字義</h4>
+          <div id="vDefinitions" class="space-y-2 text-sm max-h-60 overflow-y-auto pr-2"></div>
         </div>
-        <div class="crayon-border bg-white p-4 space-y-2">
-          <h4 class="display text-[color:var(--coral)]">造句示範</h4>
-          <p id="vSent1" class="text-sm"></p>
-          <p id="vSent2" class="text-sm"></p>
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="crayon-border bg-[color:var(--green)]/10 p-4">
-          <h4 class="display text-[color:var(--green)] mb-1">近義字</h4>
-          <div id="vSynonyms" class="flex flex-wrap gap-2"></div>
-        </div>
-        <div class="crayon-border bg-[color:var(--blue)]/10 p-4">
-          <h4 class="display text-[color:var(--blue)] mb-1">反義字</h4>
-          <div id="vAntonyms" class="flex flex-wrap gap-2"></div>
+        <div class="crayon-border bg-white p-5 space-y-3">
+          <h4 class="display text-xl text-[color:var(--coral)]">✍️ 造句與範例</h4>
+          <div id="vSentences" class="space-y-2 text-sm max-h-60 overflow-y-auto pr-2"></div>
         </div>
       </div>
-      <div class="crayon-border bg-[color:var(--yellow)]/15 p-4">
-        <h4 class="display mb-1">延伸例句</h4>
-        <ul id="vExtra" class="list-disc list-inside text-sm space-y-1"></ul>
+    </div>
+  </div>
+
+  <!-- ============ 測驗面板 ============ -->
+  <div id="panelQuiz" class="panel -mt-1 p-6 sm:p-8 space-y-6 hidden">
+    <div class="no-print">
+        <h3 class="display text-2xl text-[color:var(--coral)] mb-2">📝 產生成語測驗卷</h3>
+        <p class="text-sm mb-4">從收藏庫選擇要測驗的成語，我們會自動幫你挖空造句，變成超實用的複習考卷喔！</p>
+        
+        <div class="flex items-center gap-3 mb-4 p-3 bg-[color:var(--blue)]/10 rounded-xl crayon-border">
+            <label class="font-bold text-sm">快速篩選：</label>
+            <select id="quizFilterGrade" onchange="renderQuizSelection()" class="px-2 py-1 crayon-border text-sm bg-white"><option value="">全部年級</option></select>
+            <select id="quizFilterLesson" onchange="renderQuizSelection()" class="px-2 py-1 crayon-border text-sm bg-white"><option value="">全部課次</option></select>
+        </div>
+
+        <div id="quizSelectionArea" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 max-h-48 overflow-y-auto p-2 bg-white/50 border-2 border-dashed border-[color:var(--ink)]/30 rounded-xl"></div>
+
+        <button onclick="generateQuiz()" class="btn-doodle w-full py-3 font-bold display text-xl bg-[color:var(--yellow)]">✨ 產生測驗卷！</button>
+    </div>
+
+    <div id="printQuizArea" class="hidden bg-white p-8 sm:p-12 min-h-[500px]">
+        <div class="text-center mb-8 pb-4 border-b-2 border-[color:var(--ink)]/20">
+            <h2 class="display text-3xl mb-4">🌱 國語文成語小測驗</h2>
+            <div class="flex justify-between text-lg font-bold">
+                <span>班級：_______ 座號：____</span>
+                <span>姓名：_____________</span>
+                <span>得分：_______</span>
+            </div>
+        </div>
+        
+        <div class="mb-6 p-4 bg-[color:var(--cream)] border-2 border-dashed border-[color:var(--ink)]/30 rounded-xl">
+            <h4 class="font-bold mb-2">📚 參考詞庫 (請填入下方空格中)：</h4>
+            <div id="quizWordBank" class="flex flex-wrap gap-4 text-lg font-bold text-[color:var(--blue)] tracking-widest"></div>
+        </div>
+
+        <div class="space-y-6 text-lg leading-relaxed">
+            <ol id="quizQuestions" class="list-decimal list-inside space-y-6"></ol>
+        </div>
+
+        <div class="no-print mt-8 flex justify-center">
+            <button onclick="printQuiz()" class="btn-doodle bg-[color:var(--green)] text-white px-8 py-3 text-xl font-bold">🖨️ 列印此測驗卷</button>
+        </div>
+    </div>
+  </div>
+
+  <!-- ============ 管理與設定面板 ============ -->
+  <div id="panelManage" class="panel -mt-1 p-6 sm:p-8 space-y-8 hidden">
+    <div class="crayon-border bg-[color:var(--blue)]/10 p-5 rounded-2xl">
+      <button onclick="toggleLessonSetup()" class="w-full flex justify-between items-center text-left">
+        <div>
+          <h3 class="display text-2xl text-[color:var(--blue)]">📅 課程名稱設定</h3>
+          <p class="text-sm font-medium mt-1">幫每個年級輸入這學期實際的課名，查詢時會更直覺喔！</p>
+        </div>
+        <span id="lessonSetupArrow" class="text-3xl text-[color:var(--blue)]">▼</span>
+      </button>
+      <div id="lessonSetupBody" class="hidden mt-5 pt-4 border-t-2 border-dashed border-[color:var(--blue)]/30">
+        <div class="flex items-center gap-3 mb-4">
+          <label class="font-bold">選擇年級：</label>
+          <select id="lessonSetupGrade" onchange="loadLessonSetupForm()" class="px-3 py-2 crayon-border bg-white focus:outline-none">
+            <option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option selected>五年級</option><option>六年級</option>
+          </select>
+        </div>
+        <div id="lessonNameInputs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4"></div>
+        <button onclick="saveLessonNames()" class="btn-doodle bg-[color:var(--blue)] text-white font-bold px-6 py-2.5 text-lg">💾 儲存課表</button>
       </div>
     </div>
 
-    <div class="no-print flex flex-wrap justify-between items-center gap-3 pt-4 border-t-2 border-dashed border-[color:var(--ink)]/30">
-      <h3 class="display text-xl">🗂️ 收藏庫</h3>
-      <div class="flex flex-wrap gap-2 items-center">
-        <select id="filterGrade" onchange="renderLibrary()" class="px-3 py-2 crayon-border text-sm bg-white"><option value="">全部年級</option></select>
-        <select id="filterLesson" onchange="renderLibrary()" class="px-3 py-2 crayon-border text-sm bg-white"><option value="">全部課次</option></select>
-        <button onclick="window.print()" class="btn-doodle bg-[color:var(--green)] text-white text-sm font-bold px-4 py-2">🖨️ 列印</button>
-        <button onclick="clearLibrary()" class="text-xs text-[color:var(--coral)] font-bold px-2">清空收藏</button>
-      </div>
+    <div class="crayon-border bg-[color:var(--green)]/10 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+            <h3 class="display text-xl text-[color:var(--green)]">📦 辭典資料備份</h3>
+            <p class="text-sm mt-1">匯出所有圖卡與生字紀錄，換電腦也不怕資料不見！</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="exportData()" class="btn-doodle bg-[color:var(--green)] text-white px-4 py-2 font-bold text-sm">📤 匯出備份檔</button>
+            <label class="btn-doodle bg-white text-[color:var(--ink)] px-4 py-2 font-bold text-sm cursor-pointer text-center">
+                📥 匯入備份檔
+                <input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(event)">
+            </label>
+        </div>
     </div>
-    <div id="libraryContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+
+    <div class="pt-2">
+      <div class="flex flex-wrap justify-between items-end gap-3 mb-4 border-b-2 border-dashed border-[color:var(--ink)]/30 pb-3">
+        <div>
+          <h3 class="display text-2xl">🗂️ 我們的學習百寶箱</h3>
+          <p id="storageUsageText" class="text-sm font-bold text-[color:var(--purple)] mt-1"></p>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <select id="filterGrade" onchange="renderLibrary()" class="px-3 py-2 crayon-border text-sm bg-white font-bold"><option value="">全部年級</option></select>
+          <select id="filterLesson" onchange="renderLibrary()" class="px-3 py-2 crayon-border text-sm bg-white font-bold"><option value="">全部課次</option></select>
+          <select id="filterType" onchange="renderLibrary()" class="px-3 py-2 crayon-border text-sm bg-white font-bold"><option value="">全部類別</option><option value="idiom">成語</option><option value="vocab">生字</option></select>
+          <button onclick="printLibrary()" class="btn-doodle bg-[color:var(--green)] text-white text-sm font-bold px-4 py-2">🖨️ 列印此頁清單</button>
+        </div>
+      </div>
+      <div id="libraryContainer" class="flex flex-col gap-4"></div>
+    </div>
   </div>
 </div>
 
 <script>
-/* ---------- 已生成的真實漫畫圖庫(家長用 AI 繪圖工具畫好後放進來) ---------- */
-const prebuiltComics = {
-  "驚慌失措": {
-    image: "images/jinghuang-shicuo.png",
-    captions: [
-      "陽光灑進教室,他開心地寫著功課。",
-      "忽然,四周變得安靜又奇怪,他滿臉疑惑。",
-      "「哇啊!」他嚇了一跳,紙筆整個飛起來!",
-      "全班同學也跟著慌張,教室瞬間亂成一團。"
-    ]
-  },
-  "杯弓蛇影": {
-    image: "images/beigong-sheying.png",
-    captions: [
-      "弟弟喝水時,發現杯子裡好像有個黑影。",
-      "「有蛇!」他嚇得跳起來,想找哥哥求救。",
-      "哥哥走近一看,原來是牆上弓形掛飾的影子。",
-      "原來只是一場誤會,兩人笑著繼續喝茶聊天。"
-    ]
-  }
-};
-
-/* ---------- 從PDF小學堂匯入的成語資料(完整文字+單張情境圖,不需再呼叫AI) ---------- */
-const prebuiltFullData = {
-  "畫龍點睛": {
-    zhuyin: "ㄏㄨㄚˋ ㄌㄨㄥˊ ㄉㄧㄢˇ ㄐㄧㄥ",
-    meaning: "比喻繪畫、作文時在關鍵地方加上一筆，使內容更生動傳神。",
-    synonyms: ["錦上添花","點石成金"],
-    antonyms: ["畫蛇添足","弄巧成拙"],
-    sentence: "這篇文章的結尾加了這句名言，簡直是畫龍點睛，讓整篇文章的主題昇華了。",
-    extraSentences: [],
-    singleImage: "images/hualong-dianjing.png"
-  },
-  "守株待兔": {
-    zhuyin: "ㄕㄡˇ ㄓㄨ ㄉㄞˋ ㄊㄨˋ",
-    meaning: "比喻拘泥守成，不知變通。或比喻妄想不勞而獲。",
-    synonyms: ["刻舟求劍","墨守成規","好逸惡勞"],
-    antonyms: ["隨機應變","見機行事","勤勤懇懇"],
-    sentence: "成功需要靠努力去爭取，只想守株待兔等待機會降臨，是不切實際的。",
-    extraSentences: [],
-    singleImage: "images/shouzhu-daitu.png"
-  },
-  "掩耳盜鈴": {
-    zhuyin: "ㄧㄢˇ ㄦˇ ㄉㄠˋ ㄌㄧㄥˊ",
-    meaning: "摀住自己的耳朵去偷鈴鐺。比喻自己欺騙自己，明明掩蓋不住的事情偏要想法子掩蓋。",
-    synonyms: ["自欺欺人","弄巧成拙"],
-    antonyms: ["實事求是","開誠布公"],
-    sentence: "明明考卷上寫著不及格，他卻告訴爸媽考得很好，這簡直是掩耳盜鈴。",
-    extraSentences: [],
-    singleImage: "images/yan-er-daoling.png"
-  }
-};
-
 let currentIdiomData=null, currentVocabData=null;
-const LESSONS = Array.from({length:12},(_,i)=>`第${i+1}課`);
-let lessonNames = JSON.parse(localStorage.getItem('idiom_vocab_lessonNames_v1')||'{}');
+let batchVocabList = [];
 
-function lessonLabel(grade, i){
-  const custom = (lessonNames[grade]||[])[i];
-  return custom ? `第${i+1}課 ${custom}` : `第${i+1}課`;
-}
-function buildLessonOptions(grade){
-  return LESSONS.map((l,i)=>`<option value="${l}" ${i===0?'selected':''}>${lessonLabel(grade,i)}</option>`).join('');
-}
-function refreshLessonDropdown(gradeSelectId, lessonSelectId){
-  const grade = document.getElementById(gradeSelectId).value;
-  document.getElementById(lessonSelectId).innerHTML = buildLessonOptions(grade);
-}
-function toggleLessonSetup(){
-  const body = document.getElementById('lessonSetupBody');
-  const arrow = document.getElementById('lessonSetupArrow');
-  const willShow = body.classList.contains('hidden');
-  body.classList.toggle('hidden');
-  arrow.innerText = willShow ? '▲' : '▼';
-  if(willShow) loadLessonSetupForm();
-}
-function loadLessonSetupForm(){
-  const grade = document.getElementById('lessonSetupGrade').value;
-  const existing = lessonNames[grade] || [];
-  const box = document.getElementById('lessonNameInputs');
-  box.innerHTML = LESSONS.map((l,i)=>`
-    <div>
-      <label class="text-xs font-bold block">${l}</label>
-      <input class="lessonNameInput w-full px-2 py-1.5 crayon-border bg-white text-sm" data-idx="${i}" value="${existing[i]||''}" placeholder="課名(選填)">
-    </div>
-  `).join('');
-}
-function saveLessonNames(){
-  const grade = document.getElementById('lessonSetupGrade').value;
-  const inputs = document.querySelectorAll('.lessonNameInput');
-  const names = [];
-  inputs.forEach(inp=>{ names[parseInt(inp.dataset.idx)] = inp.value.trim(); });
-  lessonNames[grade] = names;
-  localStorage.setItem('idiom_vocab_lessonNames_v1', JSON.stringify(lessonNames));
-  alert(`${grade}的課名已儲存!下拉選單已更新。`);
-  ['idiomGrade','vocabGrade'].forEach(id=>{
-    if(document.getElementById(id).value===grade){
-      const lessonId = id==='idiomGrade' ? 'idiomLesson' : 'vocabLesson';
-      refreshLessonDropdown(id, lessonId);
-    }
-  });
-}
-/* ---------- IndexedDB 儲存(取代localStorage，容量大很多) ---------- */
+const LESSONS = Array.from({length:15},(_,i)=>`第${i+1}課`);
+let lessonNames = JSON.parse(localStorage.getItem('idiom_vocab_lessonNames_v1')||'{}');
+let savedLibrary = JSON.parse(localStorage.getItem('idiom_vocab_library_v3')||'[]');
+
 const IDB_NAME='idiomDictDB', IDB_STORE='userIdioms';
 let idbPromise=null;
 function openIDB(){
@@ -430,32 +374,24 @@ async function idbPut(record){
     tx.onerror = ()=>reject(tx.error);
   });
 }
-async function idbDelete(idiom){
+async function idbClear(){
   const db = await openIDB();
   return new Promise((resolve,reject)=>{
     const tx = db.transaction(IDB_STORE,'readwrite');
-    tx.objectStore(IDB_STORE).delete(idiom);
+    tx.objectStore(IDB_STORE).clear();
     tx.oncomplete = resolve;
     tx.onerror = ()=>reject(tx.error);
   });
 }
+
 let userLibrary = {};
 async function loadUserLibrary(){
-  // 搬移舊版 localStorage 資料(如果有)進 IndexedDB，搬完就清掉舊資料
-  const oldRaw = localStorage.getItem('idiom_vocab_userImages_v1');
-  if(oldRaw){
-    try{
-      const old = JSON.parse(oldRaw);
-      for(const k of Object.keys(old)){
-        await idbPut({idiom:k, ...old[k]});
-      }
-      localStorage.removeItem('idiom_vocab_userImages_v1');
-    }catch(e){}
-  }
   const all = await idbGetAll();
   userLibrary = {};
   all.forEach(r=>{ const {idiom, ...rest} = r; userLibrary[idiom] = rest; });
+  updateStorageUsage();
 }
+
 async function updateStorageUsage(){
   const el = document.getElementById('storageUsageText');
   if(!el) return;
@@ -463,16 +399,12 @@ async function updateStorageUsage(){
     if(navigator.storage && navigator.storage.estimate){
       const {usage, quota} = await navigator.storage.estimate();
       const mb = (usage/1024/1024).toFixed(1);
-      const qMb = (quota/1024/1024).toFixed(0);
-      el.innerText = `已使用空間：約 ${mb} MB / ${qMb} MB`;
-    } else {
-      el.innerText = '';
-    }
+      el.innerText = `📦 記憶體已使用：約 ${mb} MB`;
+    } else { el.innerText = ''; }
   }catch(e){ el.innerText=''; }
 }
 
-/* ---------- 圖片壓縮(上傳前自動處理) ---------- */
-function compressImage(file, maxDim=1000, quality=0.82){
+function compressImageToJPEG(file, maxDim=800, quality=0.82){
   return new Promise((resolve,reject)=>{
     const reader = new FileReader();
     reader.onload = e=>{
@@ -484,7 +416,7 @@ function compressImage(file, maxDim=1000, quality=0.82){
         const canvas = document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve({dataUrl:canvas.toDataURL('image/jpeg',quality), width:w, height:h});
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -494,105 +426,26 @@ function compressImage(file, maxDim=1000, quality=0.82){
   });
 }
 
-document.getElementById('mImageFile').addEventListener('change', async e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const {dataUrl} = await compressImage(file);
-  document.getElementById('mPreviewImg').src = dataUrl;
-  document.getElementById('mPreview').classList.remove('hidden');
-  document.getElementById('mPreviewInfo').innerText = `已壓縮，大小約 ${Math.round(dataUrl.length/1024)} KB`;
-});
-
-async function saveUserIdiom(){
-  const idiom = document.getElementById('mIdiom').value.trim();
-  const file = document.getElementById('mImageFile').files[0];
-  if(!idiom){ alert('請輸入成語名稱！'); return; }
-  if(!file && !document.getElementById('mPreviewImg').src.startsWith('data:')){ alert('請上傳一張圖片！'); return; }
-
-  let dataUrl = document.getElementById('mPreviewImg').src;
-  if(file){
-    const compressed = await compressImage(file);
-    dataUrl = compressed.dataUrl;
-  }
-
-  const newRecord = {
-    zhuyin: document.getElementById('mZhuyin').value.trim(),
-    meaning: document.getElementById('mMeaning').value.trim(),
-    synonyms: document.getElementById('mSynonyms').value.split('、').map(s=>s.trim()).filter(Boolean),
-    antonyms: document.getElementById('mAntonyms').value.split('、').map(s=>s.trim()).filter(Boolean),
-    sentence: document.getElementById('mSentence').value.trim(),
-    extraSentences: [],
-    singleImage: dataUrl
-  };
-  try{
-    await idbPut({idiom, ...newRecord});
-    userLibrary[idiom] = newRecord;
-    alert(`「${idiom}」圖卡已儲存！之後查詢這個成語就會顯示這張圖。`);
-    ['mIdiom','mZhuyin','mMeaning','mSynonyms','mAntonyms','mSentence'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('mImageFile').value='';
-    document.getElementById('mPreview').classList.add('hidden');
-    renderUserLibraryList();
-    updateStorageUsage();
-  }catch(e){
-    alert('儲存失敗，請稍後再試，或聯繫協助排查。');
-  }
+async function uploadIdiomImage(event) {
+    const file = event.target.files[0];
+    if(!file || !currentIdiomData) return;
+    try {
+        const compressed = await compressImageToJPEG(file);
+        currentIdiomData.singleImage = compressed;
+        await idbPut({ idiom: currentIdiomData.idiom, ...currentIdiomData });
+        userLibrary[currentIdiomData.idiom] = currentIdiomData;
+        alert('🎉 成語情境圖卡上傳成功！');
+        generateIdiomContent(currentIdiomData.idiom);
+    } catch(e) {
+        alert('圖片上傳失敗，請再試一次。');
+    }
 }
 
-function renderUserLibraryList(){
-  const container = document.getElementById('userLibraryList');
-  const keys = Object.keys(userLibrary);
-  if(keys.length===0){
-    container.innerHTML = `<p class="text-sm col-span-2 text-center py-4 text-[color:var(--ink)]/50">目前還沒有新增任何圖卡。</p>`;
-    return;
-  }
-  container.innerHTML = keys.map(k=>`
-    <div class="crayon-border bg-white p-3 flex gap-3 items-center">
-      <img src="${userLibrary[k].singleImage}" class="w-16 h-16 object-cover rounded-lg border-2 border-[color:var(--ink)]/20">
-      <div class="flex-1">
-        <div class="font-bold display">${k}</div>
-        <div class="text-xs text-[color:var(--ink)]/60">${userLibrary[k].zhuyin||''}</div>
-      </div>
-      <button onclick="deleteUserIdiom('${k}')" class="text-[color:var(--coral)] font-bold px-2">✕</button>
-    </div>
-  `).join('');
+async function fetchMoedict(word){
+  const res = await fetch(`https://www.moedict.tw/uni/${encodeURIComponent(word)}.json`);
+  if(!res.ok) throw new Error('查無此字詞');
+  return await res.json();
 }
-
-async function deleteUserIdiom(idiom){
-  if(!confirm(`確定要刪除「${idiom}」的圖卡嗎？`)) return;
-  await idbDelete(idiom);
-  delete userLibrary[idiom];
-  renderUserLibraryList();
-  updateStorageUsage();
-}
-let savedLibrary = JSON.parse(localStorage.getItem('idiom_vocab_library_v3')||'[]');
-['idiomLesson','vocabLesson'].forEach(id=>{
-  const gradeId = id==='idiomLesson' ? 'idiomGrade' : 'vocabGrade';
-  document.getElementById(id).innerHTML = buildLessonOptions(document.getElementById(gradeId).value);
-});
-document.getElementById('idiomGrade').addEventListener('change', ()=>refreshLessonDropdown('idiomGrade','idiomLesson'));
-document.getElementById('vocabGrade').addEventListener('change', ()=>refreshLessonDropdown('vocabGrade','vocabLesson'));
-['filterGrade'].forEach(id=>{
-  document.getElementById(id).innerHTML += ['一','二','三','四','五','六'].map(g=>`<option value="${g}年級">${g}年級</option>`).join('');
-});
-document.getElementById('filterLesson').innerHTML += LESSONS.map(l=>`<option value="${l}">${l}</option>`).join('');
-
-/* ---------- 音效與發音 ---------- */
-let audioCtx=null;
-function playClick(){
-  try{
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(880,audioCtx.currentTime);
-    o.frequency.exponentialRampToValueAtTime(440,audioCtx.currentTime+0.08);
-    g.gain.setValueAtTime(0.12,audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.1);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime+0.1);
-  }catch(e){}
-}
-document.addEventListener('click', e=>{
-  if(e.target.closest('button')) playClick();
-}, true);
 
 function speak(text){
   if(!text) return;
@@ -603,36 +456,28 @@ function speak(text){
     window.speechSynthesis.speak(u);
   }catch(e){}
 }
-
-/* ---------- Tab 切換 ---------- */
-function switchTab(tab){
-  const tabs = {idiom:document.getElementById('tabIdiom'), vocab:document.getElementById('tabVocab'), manage:document.getElementById('tabManage')};
-  const panels = {idiom:document.getElementById('panelIdiom'), vocab:document.getElementById('panelVocab'), manage:document.getElementById('panelManage')};
-  Object.keys(tabs).forEach(k=>{
-    if(k===tab){
-      tabs[k].className="tab-btn px-6 py-3 font-bold display text-lg bg-[color:var(--coral)] text-white";
-      panels[k].classList.remove('hidden');
-    } else {
-      tabs[k].className="tab-btn px-6 py-3 font-bold display text-lg bg-white text-[color:var(--ink)]";
-      panels[k].classList.add('hidden');
-    }
-  });
-  if(tab==='vocab') renderLibrary();
-  if(tab==='manage'){ renderUserLibraryList(); loadLessonSetupForm(); updateStorageUsage(); }
-}
-function quickSelectIdiom(v){ document.getElementById('idiomInput').value=v; generateIdiomContent(); }
-
-/* ---------- 呼叫萌典 API（教育部辭典，免金鑰、開放CORS） ---------- */
-async function fetchMoedict(word){
-  const res = await fetch(`https://www.moedict.tw/uni/${encodeURIComponent(word)}.json`);
-  if(!res.ok) throw new Error('查無此字詞');
-  const data = await res.json();
-  return data;
-}
 function splitList(str){
   if(!str) return [];
   return str.split(/[、,，]/).map(s=>s.trim()).filter(Boolean);
 }
+
+function switchTab(tab){
+  ['Idiom', 'Vocab', 'Quiz', 'Manage'].forEach(t => {
+      const btn = document.getElementById(`tab${t}`);
+      const panel = document.getElementById(`panel${t}`);
+      if(t.toLowerCase() === tab.toLowerCase()){
+          btn.className = "tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-[color:var(--coral)] text-white";
+          panel.classList.remove('hidden');
+      } else {
+          btn.className = "tab-btn px-4 sm:px-5 py-3 font-bold display text-base sm:text-lg bg-white text-[color:var(--ink)]";
+          panel.classList.add('hidden');
+      }
+  });
+
+  if(tab==='manage'){ renderLibrary(); loadLessonSetupForm(); updateStorageUsage(); }
+  if(tab==='quiz'){ renderQuizSelection(); }
+}
+
 function pickIdiomFields(data){
   const h = (data.heteronyms||[])[0] || {};
   const defs = h.definitions || [];
@@ -653,6 +498,7 @@ function pickIdiomFields(data){
     extraSentences: defs.slice(1,3).map(d=>d.def).filter(Boolean)
   };
 }
+
 async function getCharBreakdown(chars){
   const uniqueChars = [...new Set(chars.split(''))];
   const results = await Promise.all(uniqueChars.map(async c=>{
@@ -667,44 +513,13 @@ async function getCharBreakdown(chars){
   return chars.split('').map(c=>map[c]);
 }
 
-/* ---------- 生成小插畫 (簡易 SVG) ---------- */
-function sceneSVG(bg, shapes){
-  return `<svg viewBox="0 0 200 150" class="w-full h-24 sm:h-28">
-    <rect width="200" height="150" rx="14" fill="${bg}"/>${shapes}</svg>`;
-}
-/* 依關鍵詞挑一個很簡單的手繪小人/場景，讓每個步驟有專屬小圖 */
-function doodleFor(idx, palette){
-  const c = palette[idx % palette.length];
-  const faces = [
-    // 站立小人
-    `<circle cx="100" cy="55" r="18" fill="#F7D9B6" stroke="#4A3728" stroke-width="3"/>
-     <rect x="82" y="72" width="36" height="45" rx="10" fill="${c}" stroke="#4A3728" stroke-width="3"/>
-     <circle cx="92" cy="52" r="2.5" fill="#4A3728"/><circle cx="108" cy="52" r="2.5" fill="#4A3728"/>
-     <path d="M92 62 Q100 68 108 62" stroke="#4A3728" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
-    // 坐著等待
-    `<circle cx="90" cy="60" r="16" fill="#F7D9B6" stroke="#4A3728" stroke-width="3"/>
-     <rect x="60" y="76" width="70" height="14" rx="7" fill="#C9A876" stroke="#4A3728" stroke-width="3"/>
-     <rect x="76" y="76" width="28" height="34" rx="8" fill="${c}" stroke="#4A3728" stroke-width="3"/>
-     <circle cx="84" cy="58" r="2.2" fill="#4A3728"/><circle cx="96" cy="58" r="2.2" fill="#4A3728"/>`,
-    // 驚訝表情
-    `<circle cx="100" cy="60" r="20" fill="#F7D9B6" stroke="#4A3728" stroke-width="3"/>
-     <circle cx="90" cy="58" r="3" fill="#4A3728"/><circle cx="110" cy="58" r="3" fill="#4A3728"/>
-     <ellipse cx="100" cy="72" rx="5" ry="7" fill="#4A3728"/>
-     <rect x="78" y="88" width="44" height="30" rx="10" fill="${c}" stroke="#4A3728" stroke-width="3"/>`,
-    // 動作/奔跑
-    `<circle cx="95" cy="50" r="15" fill="#F7D9B6" stroke="#4A3728" stroke-width="3"/>
-     <path d="M85 65 L70 100 M105 65 L120 100 M85 78 L60 70 M105 78 L130 85" stroke="${c}" stroke-width="8" stroke-linecap="round"/>
-     <circle cx="90" cy="47" r="2" fill="#4A3728"/><circle cx="100" cy="47" r="2" fill="#4A3728"/>`
-  ];
-  return sceneSVG('#FFF8E7', faces[idx % faces.length]);
-}
-
-/* ---------- 成語生成 ---------- */
-async function generateIdiomContent(){
-  const idiom = document.getElementById('idiomInput').value.trim();
+async function generateIdiomContent(forceIdiom = null){
+  const idiom = forceIdiom || document.getElementById('idiomInput').value.trim();
+  if(forceIdiom) document.getElementById('idiomInput').value = forceIdiom;
+  
   const grade = document.getElementById('idiomGrade').value;
   const lesson = document.getElementById('idiomLesson').value;
-  if(!idiom){ alert('請輸入成語！'); return; }
+  if(!idiom){ alert('請輸入成語喔！'); return; }
 
   document.getElementById('loadingIdiom').classList.remove('hidden');
   document.getElementById('cardResult').classList.add('hidden');
@@ -712,199 +527,486 @@ async function generateIdiomContent(){
   try{
     let d;
     if(userLibrary[idiom]){
-      d = {idiom, breakdown:[], comic:[], ...JSON.parse(JSON.stringify(userLibrary[idiom]))};
-    } else if(prebuiltFullData[idiom]){
-      d = {idiom, breakdown:[], comic:[], ...JSON.parse(JSON.stringify(prebuiltFullData[idiom]))};
+      d = {idiom, breakdown:[], ...JSON.parse(JSON.stringify(userLibrary[idiom]))};
+      if(!d.breakdown || d.breakdown.length === 0) d.breakdown = await getCharBreakdown(idiom);
     } else {
       const moe = await fetchMoedict(idiom);
       d = pickIdiomFields(moe);
       d.breakdown = await getCharBreakdown(idiom);
-      d.comic = [];
-      d.noComic = true;
     }
+    
     d.grade=grade; d.lesson=lesson; d.type='idiom';
     currentIdiomData = d;
 
     document.getElementById('cardMeta').innerText = `${grade} / ${lesson}`;
     document.getElementById('cardTitle').innerText = d.idiom;
     document.getElementById('cardZhuyin').innerText = d.zhuyin;
+    document.getElementById('cardMeaning').innerText = d.meaning || '（無解釋）';
 
     const bd = document.getElementById('cardBreakdown'); bd.innerHTML='';
     (d.breakdown||[]).forEach(item=>{
-      bd.innerHTML += `<div onclick="speak('${item.char}')" class="crayon-border bg-white cursor-pointer p-3 text-center wobble-l">
-        <ruby class="text-2xl display">${item.char}<rt>${item.zhuyin||''}</rt></ruby>
-        <div class="text-xs mt-1">${item.meaning||''}</div>
+      bd.innerHTML += `<div onclick="speak('${item.char}')" class="crayon-border bg-white cursor-pointer p-3 text-center wobble-hover wobble-l">
+        <ruby class="text-3xl display">${item.char}<rt>${item.zhuyin||''}</rt></ruby>
+        <div class="text-xs mt-2 text-[color:var(--ink)]/80">${item.meaning||''}</div>
       </div>`;
     });
 
     const cm = document.getElementById('cardComicGrid');
-    const prebuilt = prebuiltComics[d.idiom];
     if(d.singleImage){
-      cm.className = "grid grid-cols-1 gap-3";
-      cm.innerHTML = `<div class="crayon-border bg-white p-2 wobble-r relative max-w-md mx-auto">
+      cm.innerHTML = `<div class="crayon-border bg-white p-2 wobble-r relative max-w-xl mx-auto shadow-md">
         <div class="tape -top-2 left-1/2 -translate-x-1/2"></div>
-        <img src="${d.singleImage}" alt="${d.idiom}情境插圖" class="w-full rounded-xl border-2 border-[color:var(--ink)]/20">
-      </div>`;
-    } else if(prebuilt){
-      cm.className = "grid grid-cols-1 gap-3";
-      cm.innerHTML = `<div class="crayon-border bg-white p-3 wobble-l relative">
-        <div class="tape -top-2 left-1/2 -translate-x-1/2"></div>
-        <img src="${prebuilt.image}" alt="${d.idiom}四格漫畫" class="w-full rounded-xl border-2 border-[color:var(--ink)]/20">
-        <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
-          ${prebuilt.captions.map((c,i)=>`<div class="bg-[color:var(--yellow)]/15 rounded-lg p-2"><span class="font-bold text-[color:var(--purple)]">${i+1}.</span> ${c}</div>`).join('')}
+        <img src="${d.singleImage}" class="w-full rounded-xl border-2 border-[color:var(--ink)]/10 mb-2">
+        <div class="text-center pb-2">
+           <label class="text-xs text-[color:var(--purple)] underline cursor-pointer font-bold">🔄 更換這張成語情境圖
+             <input type="file" accept="image/*" class="hidden" onchange="uploadIdiomImage(event)">
+           </label>
         </div>
       </div>`;
     } else {
-      cm.className = "grid grid-cols-1";
-      cm.innerHTML = `<div class="crayon-border bg-white p-6 text-center wobble-l">
-        <div class="text-4xl mb-2">🖍️</div>
-        <p class="text-sm">這個成語還沒有漫畫圖！<br>可以到「➕ 新增圖卡」分頁，把你自己生成或找到的圖片加進來。</p>
+      cm.innerHTML = `<div class="crayon-border bg-white p-6 text-center max-w-xl mx-auto">
+        <p class="text-sm font-bold text-[color:var(--ink)]/70 mb-3">🎨 這筆成語還沒有情境圖卡，請上傳一張水彩故事圖：</p>
+        <input type="file" accept="image/*" class="text-sm border-2 border-[color:var(--ink)] p-2 rounded-xl bg-[color:var(--cream)]" onchange="uploadIdiomImage(event)">
       </div>`;
     }
 
-    document.getElementById('cardSynonyms').innerHTML = (d.synonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
-    document.getElementById('cardAntonyms').innerHTML = (d.antonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
-    document.getElementById('cardSentence').innerText = d.sentence||'';
+    document.getElementById('cardSynonyms').innerHTML = (d.synonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm font-bold">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
+    document.getElementById('cardAntonyms').innerHTML = (d.antonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm font-bold">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
+    document.getElementById('cardSentence').innerText = d.sentence ? `「${d.sentence}」` : '（請自行發揮想像力造句喔）';
     document.getElementById('cardExtra').innerHTML = (d.extraSentences||[]).map(s=>`<li>${s}</li>`).join('');
 
     document.getElementById('loadingIdiom').classList.add('hidden');
     document.getElementById('cardResult').classList.remove('hidden');
   }catch(e){
     document.getElementById('loadingIdiom').classList.add('hidden');
-    alert('查無此成語，請確認輸入是否正確，或稍後再試一次。');
+    alert('找不到這個成語耶，請檢查輸入是否正確！');
   }
 }
 
-/* ---------- 生字生成 ---------- */
-async function fetchVocabDetails(){
-  const vocab = document.getElementById('vocabInput').value.trim();
-  const grade = document.getElementById('vocabGrade').value;
-  const lesson = document.getElementById('vocabLesson').value;
-  if(!vocab){ alert('請輸入生字！'); return; }
+function printIdiom() {
+    document.body.classList.add('print-mode-idiom');
+    window.print();
+    document.body.classList.remove('print-mode-idiom');
+}
+
+function printLibrary() {
+    document.body.classList.add('print-mode-manage');
+    document.querySelectorAll('.lib-detail-box').forEach(el => el.classList.remove('hidden'));
+    window.print();
+    document.body.classList.remove('print-mode-manage');
+}
+
+async function fetchBatchVocab(wordOverride = null){
+  let text = wordOverride || document.getElementById('vocabInput').value.trim();
+  if(!text){ alert('請輸入字詞！'); return; }
+  
+  const chars = wordOverride ? [wordOverride] : [...new Set(text.replace(/[^\u4e00-\u9fa5]/g, '').split(''))];
+  if(chars.length === 0){ alert('未偵測到有效中文字'); return; }
 
   document.getElementById('loadingVocab').classList.remove('hidden');
   document.getElementById('vocabResult').classList.add('hidden');
+  document.getElementById('vocabBatchArea').classList.add('hidden');
+  
+  const grade = document.getElementById('vocabGrade').value;
+  const lesson = document.getElementById('vocabLesson').value;
+  batchVocabList = [];
 
-  try{
-    const moe = await fetchMoedict(vocab);
-    const h = (moe.heteronyms||[])[0] || {};
-    const defs = h.definitions || [];
-    const wordDefs = defs.filter(d=>d.def);
-    let synonyms=[], antonyms=[];
-    defs.forEach(dd=>{
-      if(dd.synonyms) synonyms = synonyms.concat(splitList(dd.synonyms));
-      if(dd.antonyms) antonyms = antonyms.concat(splitList(dd.antonyms));
-    });
-    const examples = wordDefs.map(dd=> (dd.example&&dd.example[0]) || (dd.quote&&dd.quote[0]) ).filter(Boolean);
-    const d = {
-      char: moe.title || vocab,
-      zhuyin: h.bopomofo || h.pinyin || '',
-      radical: (moe.radical ? `部首：${moe.radical}` : '') + (moe.stroke_count ? ` (${moe.stroke_count}劃)` : ''),
-      words: [],
-      synonyms: [...new Set(synonyms)],
-      antonyms: [...new Set(antonyms)],
-      sentence1: examples[0] || (wordDefs[0]&&wordDefs[0].def) || '',
-      sentence2: examples[1] || (wordDefs[1]&&wordDefs[1].def) || '',
-      extraSentences: []
-    };
-    d.grade=grade; d.lesson=lesson; d.type='vocab';
-    currentVocabData = d;
+  for(let i=0; i<chars.length; i++){
+      if(!wordOverride) {
+          document.getElementById('loadingVocabText').innerText = `正在查詢: ${chars[i]} (${i+1}/${chars.length})...`;
+      }
+      try {
+          const moe = await fetchMoedict(chars[i]);
+          const parsed = parseVocabMoeData(moe, chars[i], grade, lesson);
+          batchVocabList.push(parsed);
+      } catch(e) {
+          console.log(`查無字: ${chars[i]}`);
+      }
+      await new Promise(r => setTimeout(r, 100)); 
+  }
 
-    document.getElementById('vChar').innerText = d.char;
-    document.getElementById('vMeta').innerText = `${grade} / ${lesson}`;
-    document.getElementById('vZhuyin').innerText = d.zhuyin;
-    document.getElementById('vRadical').innerText = d.radical;
-    document.getElementById('vSent1').innerText = d.sentence1;
-    document.getElementById('vSent2').innerText = d.sentence2;
-    document.getElementById('vWords').innerHTML = (d.words||[]).map(w=>`<span onclick="speak('${w}')" class="crayon-border bg-white px-3 py-1 text-sm cursor-pointer">${w} 🔊</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（辭典未提供常用語詞）</span>';
-    document.getElementById('vSynonyms').innerHTML = (d.synonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
-    document.getElementById('vAntonyms').innerHTML = (d.antonyms||[]).map(w=>`<span class="crayon-border bg-white px-3 py-1 text-sm">${w}</span>`).join('') || '<span class="text-sm text-[color:var(--ink)]/50">（無）</span>';
-    document.getElementById('vExtra').innerHTML = (d.extraSentences||[]).map(s=>`<li>${s}</li>`).join('');
-
-    document.getElementById('loadingVocab').classList.add('hidden');
-    document.getElementById('vocabResult').classList.remove('hidden');
-  }catch(e){
-    document.getElementById('loadingVocab').classList.add('hidden');
-    alert('查無此生字，請確認輸入是否正確。');
+  document.getElementById('loadingVocab').classList.add('hidden');
+  
+  if(batchVocabList.length > 0) {
+      renderVocabTabs();
+      showVocabCard(0);
+      if(batchVocabList.length > 1) {
+          document.getElementById('vocabBatchArea').classList.remove('hidden');
+      }
+  } else {
+      alert('抱歉，找不到您輸入的生字資料！');
   }
 }
 
-/* ---------- 收藏庫 ---------- */
-function prefillManageForm(){
-  if(!currentIdiomData) return;
-  const d = currentIdiomData;
-  switchTab('manage');
-  document.getElementById('mIdiom').value = d.idiom || '';
-  document.getElementById('mZhuyin').value = d.zhuyin || '';
-  document.getElementById('mMeaning').value = d.meaning || '';
-  document.getElementById('mSynonyms').value = (d.synonyms||[]).join('、');
-  document.getElementById('mAntonyms').value = (d.antonyms||[]).join('、');
-  document.getElementById('mSentence').value = d.sentence || '';
-  document.getElementById('mImageFile').scrollIntoView({behavior:'smooth', block:'center'});
+function parseVocabMoeData(moe, char, grade, lesson) {
+    const h = (moe.heteronyms||[])[0] || {};
+    const defs = h.definitions || [];
+    
+    let allDefs = defs.map((d, idx) => `${idx+1}. ${d.type ? `[${d.type}] ` : ''}${d.def}`).filter(Boolean);
+    
+    let allSentences = [];
+    defs.forEach(d => {
+        if(d.example) {
+            d.example.forEach(ex => allSentences.push(`例：${ex}`));
+        }
+        if(d.quote) {
+            d.quote.forEach(q => allSentences.push(`引：${q}`));
+        }
+    });
+
+    return {
+      char: moe.title || char,
+      zhuyin: h.bopomofo || h.pinyin || '',
+      radical: (moe.radical ? `部首：${moe.radical}` : '') + (moe.stroke_count ? ` (${moe.stroke_count}劃)` : ''),
+      definitions: allDefs,
+      sentences: allSentences,
+      grade, lesson, type: 'vocab'
+    };
 }
 
-function saveIdiomToLibrary(){
-  if(!currentIdiomData) return;
-  savedLibrary.push(currentIdiomData);
-  localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
-  alert('已收藏成語！');
+function renderVocabTabs(){
+    const tabArea = document.getElementById('vocabTabs');
+    tabArea.innerHTML = batchVocabList.map((item, idx) => `
+        <button onclick="showVocabCard(${idx})" class="w-10 h-10 rounded-lg text-lg font-bold ZCOOL KuaiLe border-2 border-[color:var(--ink)] bg-white text-[color:var(--purple)] hover:bg-[color:var(--cream)] hover:scale-110 transition-transform flex items-center justify-center">
+            ${item.char}
+        </button>
+    `).join('');
 }
+
+function showVocabCard(index) {
+    const d = batchVocabList[index];
+    currentVocabData = d;
+    document.getElementById('vChar').innerText = d.char;
+    document.getElementById('vMeta').innerText = `${d.grade} / ${d.lesson}`;
+    document.getElementById('vZhuyin').innerText = d.zhuyin;
+    document.getElementById('vRadical').innerText = d.radical;
+    
+    const defContainer = document.getElementById('vDefinitions');
+    if(d.definitions && d.definitions.length > 0) {
+        defContainer.innerHTML = d.definitions.map(item => `<p class="p-2 bg-[color:var(--cream)] rounded-lg text-[color:var(--ink)]">${item}</p>`).join('');
+    } else {
+        defContainer.innerHTML = '<p class="text-sm text-[color:var(--ink)]/60">（無詳細字義紀錄）</p>';
+    }
+
+    const sentContainer = document.getElementById('vSentences');
+    if(d.sentences && d.sentences.length > 0) {
+        sentContainer.innerHTML = d.sentences.map(item => `<p class="p-2 bg-[color:var(--blue)]/10 rounded-lg text-[color:var(--ink)]">${item}</p>`).join('');
+    } else {
+        sentContainer.innerHTML = '<p class="text-sm text-[color:var(--ink)]/60">（無造句範例）</p>';
+    }
+
+    document.getElementById('vocabResult').classList.remove('hidden');
+}
+
+function saveAllBatchToLibrary() {
+    if(batchVocabList.length === 0) return;
+    let addedCount = 0;
+    batchVocabList.forEach(item => {
+        if(!savedLibrary.some(i => i.char === item.char && i.type === 'vocab')) {
+            savedLibrary.push(item);
+            addedCount++;
+        }
+    });
+    localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
+    alert(`✅ 已成功將整課共 ${addedCount} 個生字收入收藏庫！`);
+}
+
 function saveVocabToLibrary(){
   if(!currentVocabData) return;
-  savedLibrary.push(currentVocabData);
-  localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
-  alert('已收藏生字！');
+  if(!savedLibrary.some(i => i.char === currentVocabData.char && i.type === 'vocab')) {
+      savedLibrary.push(currentVocabData);
+      localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
+      alert('🌟 已收藏生字！');
+  } else { alert('這個生字已經在收藏庫裡囉！'); }
 }
+function saveIdiomToLibrary(){
+  if(!currentIdiomData) return;
+  if(!savedLibrary.some(i => i.idiom === currentIdiomData.idiom && i.type === 'idiom')) {
+      savedLibrary.push(currentIdiomData);
+      localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
+      alert('🌟 已成功收藏成語！');
+  } else { alert('這個成語已經在收藏庫裡囉！'); }
+}
+
+function renderQuizSelection() {
+    const container = document.getElementById('quizSelectionArea');
+    const fg = document.getElementById('quizFilterGrade').value;
+    const fl = document.getElementById('quizFilterLesson').value;
+    
+    let idioms = savedLibrary.filter(i => i.type === 'idiom');
+    if(fg) idioms = idioms.filter(i => i.grade === fg);
+    if(fl) idioms = idioms.filter(i => i.lesson === fl);
+
+    if (idioms.length === 0) {
+        container.innerHTML = '<div class="col-span-full text-center text-sm p-4 text-[color:var(--ink)]/60">目前此條件下沒有收藏的成語。請先去查詢並收藏喔！</div>';
+        return;
+    }
+
+    container.innerHTML = idioms.map((item, idx) => `
+        <label class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border-2 border-[color:var(--ink)]/20 cursor-pointer hover:bg-[color:var(--cream)]">
+            <input type="checkbox" value="${item.idiom}" class="quiz-checkbox w-4 h-4 accent-[color:var(--coral)]">
+            <span class="font-bold text-[color:var(--ink)]">${item.idiom}</span>
+        </label>
+    `).join('');
+}
+
+function generateQuiz() {
+    const checkboxes = document.querySelectorAll('.quiz-checkbox:checked');
+    if(checkboxes.length === 0) { alert("請至少勾選一個成語來出題喔！"); return; }
+    
+    const selectedIdioms = Array.from(checkboxes).map(cb => cb.value);
+    let quizData = [];
+    selectedIdioms.forEach(idmStr => {
+        let data = savedLibrary.find(i => i.idiom === idmStr);
+        if(data) quizData.push(data);
+    });
+
+    quizData.sort(() => Math.random() - 0.5);
+
+    const qList = document.getElementById('quizQuestions');
+    const wordBank = document.getElementById('quizWordBank');
+    qList.innerHTML = '';
+    
+    let wordsHtml = quizData.map(d => `<span class="bg-white px-3 py-1 rounded border-2 border-[color:var(--blue)]/30">${d.idiom}</span>`);
+    wordsHtml.sort(() => Math.random() - 0.5);
+    wordBank.innerHTML = wordsHtml.join('');
+
+    quizData.forEach(item => {
+        let baseText = (item.sentence && item.sentence.length > 5) ? item.sentence : item.meaning;
+        if (!baseText) baseText = "請寫出符合此情境的成語。";
+        
+        const blank = '<span class="inline-block border-b-2 border-[color:var(--ink)] w-24 text-transparent align-bottom mx-1">(          )</span>';
+        let questionText = baseText.replace(new RegExp(item.idiom, 'g'), blank);
+        if (questionText === baseText) questionText = baseText + " 這句成語是：" + blank;
+
+        qList.innerHTML += `<li class="pl-2"><div class="inline font-medium tracking-wide">${questionText}<div class="text-xs text-[color:var(--ink)]/50 mt-1 pl-4">提示：${item.zhuyin}</div></div></li>`;
+    });
+
+    document.getElementById('printQuizArea').classList.remove('hidden');
+    document.getElementById('printQuizArea').scrollIntoView({ behavior: 'smooth' });
+}
+
+function printQuiz() {
+    document.body.classList.add('print-mode-quiz');
+    window.print();
+    document.body.classList.remove('print-mode-quiz');
+}
+
+function lessonLabel(grade, i){ const c = (lessonNames[grade]||[])[i]; return c ? `第${i+1}課 ${c}` : `第${i+1}課`; }
+function buildLessonOptions(grade){ return LESSONS.map((l,i)=>`<option value="${l}" ${i===0?'selected':''}>${lessonLabel(grade,i)}</option>`).join(''); }
+function refreshLessonDropdown(...ids){
+    const grade = document.getElementById(ids[0]).value;
+    document.getElementById(ids[1]).innerHTML = buildLessonOptions(grade);
+}
+
+function toggleLessonSetup(){
+  const body = document.getElementById('lessonSetupBody');
+  const arrow = document.getElementById('lessonSetupArrow');
+  const willShow = body.classList.contains('hidden');
+  body.classList.toggle('hidden');
+  arrow.innerText = willShow ? '▲' : '▼';
+  if(willShow) loadLessonSetupForm();
+}
+function loadLessonSetupForm(){
+  const grade = document.getElementById('lessonSetupGrade').value;
+  const existing = lessonNames[grade] || [];
+  const box = document.getElementById('lessonNameInputs');
+  box.innerHTML = LESSONS.map((l,i)=>`
+    <div>
+      <label class="text-xs font-bold block mb-1 text-[color:var(--ink)]">${l}</label>
+      <input class="lessonNameInput w-full px-2 py-1.5 crayon-border bg-white text-sm" data-idx="${i}" value="${existing[i]||''}" placeholder="課名(選填)">
+    </div>
+  `).join('');
+}
+function saveLessonNames(){
+  const grade = document.getElementById('lessonSetupGrade').value;
+  const inputs = document.querySelectorAll('.lessonNameInput');
+  const names = [];
+  inputs.forEach(inp=>{ names[parseInt(inp.dataset.idx)] = inp.value.trim(); });
+  lessonNames[grade] = names;
+  localStorage.setItem('idiom_vocab_lessonNames_v1', JSON.stringify(lessonNames));
+  alert(`✅ ${grade}的課名已成功儲存！`);
+  ['idiomGrade','vocabGrade', 'quizFilterGrade'].forEach(id=>{
+      try {
+        if(document.getElementById(id).value===grade){
+          const target = id.replace('Grade', 'Lesson');
+          refreshLessonDropdown(id, target);
+        }
+      }catch(e){}
+  });
+}
+
 function renderLibrary(){
   const container = document.getElementById('libraryContainer');
   const fg = document.getElementById('filterGrade').value;
   const fl = document.getElementById('filterLesson').value;
+  const ft = document.getElementById('filterType').value;
   container.innerHTML='';
   let filtered = savedLibrary;
   if(fg) filtered = filtered.filter(i=>i.grade===fg);
   if(fl) filtered = filtered.filter(i=>i.lesson===fl);
+  if(ft) filtered = filtered.filter(i=>i.type===ft);
+  
   if(filtered.length===0){
-    container.innerHTML = `<p class="text-sm col-span-2 text-center py-6 text-[color:var(--ink)]/50">目前沒有收藏，快去查詢並收藏吧！</p>`;
+    container.innerHTML = `<p class="text-sm col-span-2 text-center py-10 text-[color:var(--ink)]/50 bg-white crayon-border">目前還沒有收藏資料喔！🚀</p>`;
     return;
   }
+  
   filtered.forEach((item,idx)=>{
-    const div = document.createElement('div');
-    div.className = "crayon-border bg-white p-4 flex justify-between items-start";
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = "library-card-item crayon-border bg-white p-4 flex flex-col gap-3 transition-all";
+    
+    const mainRow = document.createElement('div');
+    mainRow.className = "flex justify-between items-center cursor-pointer hover:opacity-80";
+
     if(item.type==='idiom'){
-      div.innerHTML = `<div>
-        <span class="bg-[color:var(--coral)]/20 text-xs px-2 py-0.5 rounded font-bold">${item.grade} | ${item.lesson} (成語)</span>
-        <h4 class="display text-xl mt-1">${item.idiom}</h4>
-        <p class="text-xs text-[color:var(--purple)] font-bold">${item.zhuyin||''}</p>
-        <p class="text-xs mt-1">${item.meaning||''}</p>
-      </div><button onclick="removeItem(${idx})" class="no-print text-[color:var(--coral)] font-bold">✕</button>`;
+      const userImg = userLibrary[item.idiom] ? userLibrary[item.idiom].singleImage : null;
+      const imgToUse = userImg || item.singleImage;
+
+      mainRow.innerHTML = `<div class="flex gap-3 items-center flex-1" onclick="toggleLibraryDetail(${idx})">
+        ${imgToUse ? `<img src="${imgToUse}" class="w-16 h-16 object-cover rounded-xl border border-[color:var(--ink)]/20 shrink-0">` : '<div class="w-16 h-16 bg-[color:var(--cream)] rounded-xl flex items-center justify-center text-2xl shrink-0 border border-[color:var(--ink)]/20">📖</div>'}
+        <div>
+          <span class="bg-[color:var(--coral)]/20 text-xs px-2 py-0.5 rounded font-bold">${item.grade} | ${item.lesson}</span>
+          <h4 class="display text-xl mt-1 text-[color:var(--coral)]">${item.idiom} <span class="text-xs text-[color:var(--ink)]/50 font-normal">▼ 點擊展開解析</span></h4>
+        </div>
+      </div>
+      <button onclick="event.stopPropagation(); removeItem(${idx})" class="no-print text-[color:var(--coral)] font-bold text-xl px-3 py-1 hover:scale-125 transition-transform">✕</button>`;
     } else {
-      div.innerHTML = `<div>
-        <span class="bg-[color:var(--green)]/20 text-xs px-2 py-0.5 rounded font-bold">${item.grade} | ${item.lesson} (生字)</span>
-        <h4 class="display text-xl mt-1">${item.char} <span class="text-sm text-[color:var(--purple)]">${item.zhuyin||''}</span></h4>
-        <p class="text-xs mt-1">語詞：${(item.words||[]).join('、')}</p>
-      </div><button onclick="removeItem(${idx})" class="no-print text-[color:var(--coral)] font-bold">✕</button>`;
+      mainRow.innerHTML = `<div class="flex gap-3 items-center flex-1" onclick="toggleLibraryDetail(${idx})">
+        <div class="w-16 h-16 bg-[color:var(--purple)] text-white rounded-xl flex items-center justify-center text-3xl display shrink-0 shadow-inner">${item.char}</div>
+        <div>
+          <span class="bg-[color:var(--green)]/20 text-xs px-2 py-0.5 rounded font-bold">${item.grade} | ${item.lesson}</span>
+          <h4 class="display text-xl mt-1 text-[color:var(--purple)]">${item.char} <span class="text-sm ml-1">${item.zhuyin||''}</span> <span class="text-xs text-[color:var(--ink)]/50 font-normal">▼ 點擊展開解析</span></h4>
+        </div>
+      </div>
+      <button onclick="event.stopPropagation(); removeItem(${idx})" class="no-print text-[color:var(--coral)] font-bold text-xl px-3 py-1 hover:scale-125 transition-transform">✕</button>`;
     }
-    container.appendChild(div);
+
+    const detailBox = document.createElement('div');
+    detailBox.id = `lib-detail-${idx}`;
+    detailBox.className = "lib-detail-box hidden pt-3 border-t-2 border-dashed border-[color:var(--ink)]/20 text-sm space-y-2";
+    
+    if(item.type === 'idiom') {
+        detailBox.innerHTML = `
+            <p><strong>注音：</strong>${item.zhuyin || '（無）'}</p>
+            <p><strong>意思：</strong>${item.meaning || '（無）'}</p>
+            <p><strong>造句：</strong>${item.sentence || '（無）'}</p>
+            <div class="flex gap-2 mt-2">
+                <span class="bg-[color:var(--green)]/20 px-2 py-1 rounded">近義詞：${(item.synonyms||[]).join('、') || '無'}</span>
+                <span class="bg-[color:var(--blue)]/20 px-2 py-1 rounded">反義詞：${(item.antonyms||[]).join('、') || '無'}</span>
+            </div>
+        `;
+    } else {
+        const defs = (item.definitions || []).join('<br>') || '（無詳細字義）';
+        const sents = (item.sentences || []).join('<br>') || '（無造句範例）';
+        detailBox.innerHTML = `
+            <p><strong>部首/筆畫：</strong>${item.radical || '（無）'}</p>
+            <p><strong>詳細字義：</strong><br>${defs}</p>
+            <p><strong>造句範例：</strong><br>${sents}</p>
+        `;
+    }
+
+    cardWrapper.appendChild(mainRow);
+    cardWrapper.appendChild(detailBox);
+    container.appendChild(cardWrapper);
   });
 }
-function removeItem(idx){
-  savedLibrary.splice(idx,1);
-  localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
-  renderLibrary();
+
+function toggleLibraryDetail(idx) {
+    const box = document.getElementById(`lib-detail-${idx}`);
+    if(box) {
+        box.classList.toggle('hidden');
+    }
 }
-function clearLibrary(){
-  if(confirm('確定要清空所有收藏嗎？')){
-    savedLibrary=[];
-    localStorage.removeItem('idiom_vocab_library_v3');
-    renderLibrary();
+
+function removeItem(idx){
+  if(confirm('確定要移除這個收藏嗎？')){
+      savedLibrary.splice(idx,1);
+      localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
+      renderLibrary();
   }
+}
+
+async function exportData() {
+    try {
+        const fullIDB = await idbGetAll();
+        const exportObj = {
+            savedLibrary: savedLibrary,
+            lessonNames: lessonNames,
+            customImages: fullIDB
+        };
+        const dataStr = JSON.stringify(exportObj);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement("a");
+        a.href = url;
+        const dateStr = new Date().toISOString().slice(0,10);
+        a.download = `小樹苗辭典備份_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch(e) {
+        alert("匯出失敗：" + e.message);
+    }
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if(data.savedLibrary) {
+                savedLibrary = data.savedLibrary;
+                localStorage.setItem('idiom_vocab_library_v3', JSON.stringify(savedLibrary));
+            }
+            if(data.lessonNames) {
+                lessonNames = data.lessonNames;
+                localStorage.setItem('idiom_vocab_lessonNames_v1', JSON.stringify(lessonNames));
+            }
+            if(data.customImages && Array.isArray(data.customImages)) {
+                await idbClear();
+                for(let item of data.customImages) {
+                    await idbPut(item);
+                }
+            }
+            alert("✅ 資料匯入成功！系統將為您重新載入。");
+            window.location.reload();
+        } catch(err) {
+            alert("檔案格式錯誤，無法匯入！");
+        }
+    };
+    reader.readAsText(file);
 }
 
 window.onload = async function(){
   await loadUserLibrary();
-  document.getElementById('idiomInput').value = "守株待兔";
-  generateIdiomContent();
+  
+  ['idiomLesson','vocabLesson', 'quizFilterLesson'].forEach(id=>{
+    let gradeId = '';
+    if(id==='idiomLesson') gradeId = 'idiomGrade';
+    else if(id==='vocabLesson') gradeId = 'vocabGrade';
+    else gradeId = 'quizFilterGrade';
+    
+    try { document.getElementById(id).innerHTML = buildLessonOptions(document.getElementById(gradeId).value); } catch(e){}
+  });
+
+  document.getElementById('idiomGrade').addEventListener('change', ()=>refreshLessonDropdown('idiomGrade','idiomLesson'));
+  document.getElementById('vocabGrade').addEventListener('change', ()=>refreshLessonDropdown('vocabGrade','vocabLesson'));
+  document.getElementById('quizFilterGrade').addEventListener('change', ()=>refreshLessonDropdown('quizFilterGrade','quizFilterLesson'));
+
+  const gradeOptions = ['一','二','三','四','五','六'].map(g=>`<option value="${g}年級">${g}年級</option>`).join('');
+  document.getElementById('filterGrade').innerHTML += gradeOptions;
+  document.getElementById('quizFilterGrade').innerHTML += gradeOptions;
+
+  const lessonOptions = LESSONS.map(l=>`<option value="${l}">${l}</option>`).join('');
+  document.getElementById('filterLesson').innerHTML += lessonOptions;
+  document.getElementById('quizFilterLesson').innerHTML += lessonOptions;
 };
 </script>
 </body>
 </html>
+
