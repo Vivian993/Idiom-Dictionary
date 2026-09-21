@@ -101,6 +101,7 @@
             <div id="progress-bar" class="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-500 w-0"></div>
         </div>
         <p id="progress-text" class="text-white font-bold mt-2 drop-shadow-md text-xl">已學習: 0 / 96</p>
+        <p id="user-id-display" class="text-white/70 font-medium mt-1 text-sm">連線狀態：準備中...</p>
     </div>
 
     <!-- 主要版面劃分：左邊字卡區，右邊已學習區 -->
@@ -238,9 +239,11 @@
     </div>
 
     <!-- 雲端同步狀態提示 -->
-    <div id="sync-status" class="fixed bottom-4 right-4 bg-white/90 backdrop-blur text-green-600 font-bold px-4 py-2 rounded-full shadow-lg border-2 border-green-200 transform translate-y-20 transition-transform duration-300 flex items-center gap-2 z-50">
-        <svg class="animate-spin h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        <span>雲端同步中...</span>
+    <div id="sync-status" class="fixed bottom-4 right-4 bg-white/95 backdrop-blur text-gray-700 font-bold px-4 py-3 rounded-full shadow-lg border-2 border-green-200 transform translate-y-24 transition-transform duration-300 flex items-center gap-2 z-50">
+        <span id="sync-icon">
+            <svg class="animate-spin h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </span>
+        <span id="sync-text">雲端同步中...</span>
     </div>
 
     <script type="module">
@@ -249,21 +252,52 @@
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const syncStatusUI = document.getElementById('sync-status');
-        function showSync(show) {
+        const syncText = document.getElementById('sync-text');
+        const syncIcon = document.getElementById('sync-icon');
+        const userIdDisplay = document.getElementById('user-id-display');
+        
+        const spinIcon = `<svg class="animate-spin h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+        function showSync(show, text = "雲端同步中...", type = "loading") {
             if(show) {
-                syncStatusUI.classList.remove('translate-y-20');
+                syncText.textContent = text;
+                if(type === "loading") syncIcon.innerHTML = spinIcon;
+                else if(type === "success") syncIcon.innerHTML = "✅";
+                else if(type === "error") syncIcon.innerHTML = "❌";
+                
+                syncStatusUI.classList.remove('translate-y-24');
                 syncStatusUI.classList.add('translate-y-0');
             } else {
-                setTimeout(() => {
-                    syncStatusUI.classList.remove('translate-y-0');
-                    syncStatusUI.classList.add('translate-y-20');
-                }, 800); // 延遲隱藏讓使用者看得到儲存成功
+                syncStatusUI.classList.remove('translate-y-0');
+                syncStatusUI.classList.add('translate-y-24');
             }
         }
 
+        // ==========================================
+        // ⚠️ GitHub Pages 專用 Firebase 設定區塊
+        // ==========================================
+        // 如果您希望在 GitHub Pages 上也能自動儲存進度，
+        // 請至 Firebase Console (https://console.firebase.google.com/) 建立免費專案，
+        // 啟用「Anonymous (匿名) 登入」與「Firestore 資料庫」，並將您的設定貼在下方：
+        const githubFirebaseConfig = {
+            apiKey: "請替換為您的 apiKey",
+            authDomain: "請替換為您的 authDomain",
+            projectId: "請替換為您的 projectId",
+            storageBucket: "請替換為您的 storageBucket",
+            messagingSenderId: "請替換為您的 messagingSenderId",
+            appId: "請替換為您的 appId"
+        };
+
         // 環境參數與變數宣告
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-idiom-app';
+        
+        // 判斷：如果在原平台執行就用內建設定，在 GitHub 則使用您的 githubFirebaseConfig
+        let firebaseConfig = null;
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else if (githubFirebaseConfig.apiKey !== "請替換為您的 apiKey") {
+            firebaseConfig = githubFirebaseConfig;
+        }
         
         let app, auth, db, userId;
         let isFirebaseReady = false;
@@ -475,8 +509,8 @@
                 window.speechSynthesis.cancel(); 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'zh-TW';
-                utterance.rate = 0.8;
-                utterance.pitch = 1.2;
+                utterance.rate = 0.85;
+                utterance.pitch = 1.1;
                 window.speechSynthesis.speak(utterance);
             }
         }
@@ -484,7 +518,8 @@
         async function loadProgressFromCloud() {
             if (!isFirebaseReady || !userId) return false;
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                // 使用更明確的 progressData collection 來避免路徑衝突
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progressData', 'idioms');
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -501,15 +536,17 @@
 
         async function saveProgressToCloud() {
             if (!isFirebaseReady || !userId) return;
-            showSync(true);
+            showSync(true, "雲端同步中...", "loading");
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progressData', 'idioms');
                 const learnedKeys = learnedIdioms.map(item => item.i);
                 await setDoc(docRef, { learned: learnedKeys });
-                showSync(false);
+                showSync(true, "儲存成功！", "success");
+                setTimeout(() => showSync(false), 2000);
             } catch (e) {
                 console.error("儲存進度失敗:", e);
-                showSync(false);
+                showSync(true, "儲存失敗，請檢查網路", "error");
+                setTimeout(() => showSync(false), 3000);
             }
         }
 
@@ -677,19 +714,29 @@
         async function initializeAppLogic() {
             if (isFirebaseReady) {
                 try {
+                    let userCredential;
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
+                        userCredential = await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
-                        await signInAnonymously(auth);
+                        userCredential = await signInAnonymously(auth);
                     }
-                    userId = auth.currentUser?.uid;
+                    // 確保能穩定的抓取到使用者 ID
+                    userId = userCredential.user.uid;
                     
                     if (userId) {
-                        await loadProgressFromCloud();
+                        userIdDisplay.textContent = `已連線 (識別碼: ${userId.substring(0, 6)}...)`;
+                        const hasData = await loadProgressFromCloud();
+                        if (hasData) {
+                            showSync(true, "已載入您的進度！", "success");
+                            setTimeout(() => showSync(false), 2500);
+                        }
                     }
                 } catch(e) {
                     console.error("登入/載入進度失敗:", e);
+                    userIdDisplay.textContent = "雲端連線失敗，請檢查 Firebase 設定與權限";
                 }
+            } else {
+                userIdDisplay.textContent = "單機模式：未設定 Firebase，進度將無法儲存";
             }
             
             // 確保 UI 顯示最新狀態
