@@ -237,81 +237,49 @@
 
     </div>
 
+    <!-- 雲端同步狀態提示 -->
+    <div id="sync-status" class="fixed bottom-4 right-4 bg-white/90 backdrop-blur text-green-600 font-bold px-4 py-2 rounded-full shadow-lg border-2 border-green-200 transform translate-y-20 transition-transform duration-300 flex items-center gap-2 z-50">
+        <svg class="animate-spin h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <span>雲端同步中...</span>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        const syncStatusUI = document.getElementById('sync-status');
+        function showSync(show) {
+            if(show) {
+                syncStatusUI.classList.remove('translate-y-20');
+                syncStatusUI.classList.add('translate-y-0');
+            } else {
+                setTimeout(() => {
+                    syncStatusUI.classList.remove('translate-y-0');
+                    syncStatusUI.classList.add('translate-y-20');
+                }, 800); // 延遲隱藏讓使用者看得到儲存成功
+            }
+        }
+
         // 環境參數與變數宣告
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         
         let app, auth, db, userId;
+        let isFirebaseReady = false;
         
         try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
+            if(firebaseConfig) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                isFirebaseReady = true;
+            }
         } catch (e) {
             console.error("Firebase初始化失敗:", e);
         }
 
-        // 初始化登入狀態與載入進度
-        window.initCloudStorage = async function() {
-            if (!auth) return false;
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                userId = auth.currentUser?.uid;
-                if(userId) {
-                    await loadProgress();
-                    return true;
-                }
-                return false;
-            } catch(e) {
-                console.error("登入失敗:", e);
-                return false;
-            }
-        };
-
-        // 儲存進度到雲端
-        window.saveProgressToCloud = async function(learnedArray) {
-            if (!db || !userId) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
-                // 將物件陣列轉為純文字陣列(成語名稱)儲存
-                const learnedKeys = learnedArray.map(item => item.i);
-                await setDoc(docRef, { learned: learnedKeys });
-            } catch (e) {
-                console.error("儲存進度失敗:", e);
-            }
-        };
-
-        // 讀取雲端進度
-        async function loadProgress() {
-            if (!db || !userId) return;
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data && data.learned && Array.isArray(data.learned)) {
-                        if (window.restoreProgress) {
-                            window.restoreProgress(data.learned);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error("載入進度失敗:", e);
-            }
-        }
-    </script>
-
-    <script>
-        // 原始成語資料庫 (修正了錯別字，並加入注音 z)
+        // 原始成語資料庫
         const allIdiomsData = [
             { i: "不負眾望", m: "不辜負眾人的期望。", s: "不辱使命、眾望所歸", a: "大失所望", z: "ㄅㄨˋ ㄈㄨˋ ㄓㄨㄥˋ ㄨㄤˋ" },
             { i: "見仁見智", m: "對同一件事，每個人都有不同的看法和意見。", s: "眾說紛紜、各執一詞", a: "異口同聲、所見略同", z: "ㄐㄧㄢˋ ㄖㄣˊ ㄐㄧㄢˋ ㄓˋ" },
@@ -384,7 +352,7 @@
             { i: "魚目混珠", m: "比喻以假亂真。", s: "濫竽充數、張冠李戴", a: "涇渭分明、貨真價實", z: "ㄩˊ ㄇㄨˋ ㄏㄨㄣˋ ㄓㄨ" },
             { i: "道聽塗說", m: "指沒有根據的傳聞。", s: "捕風捉影、謠言惑眾", a: "言之鑿鑿、親眼所見", z: "ㄉㄠˋ ㄊㄧㄥ ㄊㄨˊ ㄕㄨㄛ" },
             { i: "隔岸觀火", m: "比喻對別人的危難不加援手，袖手旁觀。", s: "袖手旁觀、見死不救", a: "拔刀相助、見義勇為", z: "ㄍㄜˊ ㄢˋ ㄍㄨㄢ ㄏㄨㄛˇ" },
-            { i: "目光如炬", m: "形容眼光極有神采，或指見識遠大。", s: "高瞻遠矚、明察秋毫", a: "目光如豆、鼠目寸光", z: "ㄇㄨˋ ㄍㄨㄤ ㄖㄨˊ ㄐㄩˋ" },
+            { i: "目光如炬", m: "形容眼光極有神采，或指見識遠大。", s: "高瞻遠瞩、明察秋毫", a: "目光如豆、鼠目寸光", z: "ㄇㄨˋ ㄍㄨㄤ ㄖㄨˊ ㄐㄩˋ" },
             { i: "螳臂當車", m: "比喻不自量力。", s: "蚍蜉撼樹、以卵擊石", a: "量力而行、泰山壓頂", z: "ㄊㄤˊ ㄅㄧˋ ㄉㄤ ㄔㄜ" },
             { i: "天造地設", m: "形容配合得極為完美，彷彿是天地特意安排。", s: "天作之合、珠聯璧合", a: "格格不入、水火不容", z: "ㄊㄧㄢ ㄗㄠˋ ㄉㄧˋ ㄕㄜˋ" },
             { i: "三頭六臂", m: "比喻人神通廣大，本領出眾。", s: "神通廣大、本領通天", a: "無能為力、一無是處", z: "ㄙㄢ ㄊㄡˊ ㄌㄧㄡˋ ㄅㄧˋ" },
@@ -424,7 +392,21 @@
         let polySynth = null;
         let isAudioInitialized = false;
 
-        // 將成語字串與注音字串轉換為含 <ruby> 標籤的 HTML
+        const cardContainer = document.getElementById('card-container');
+        const cardInner = document.getElementById('card-inner');
+        const emptyState = document.getElementById('empty-state');
+        const controlsContainer = document.getElementById('controls-container');
+        const frontIdiomText = document.getElementById('card-idiom');
+        const backIdiomText = document.getElementById('card-idiom-back');
+        const meaningText = document.getElementById('card-meaning');
+        const synonymsText = document.getElementById('card-synonyms');
+        const antonymsText = document.getElementById('card-antonyms');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const learnedList = document.getElementById('learned-list');
+        const learnedEmptyMsg = document.getElementById('learned-empty-msg');
+        const learnedCountBadge = document.getElementById('learned-count-badge');
+
         function renderZhuyinHTML(text, zhuyinStr) {
             if (!zhuyinStr) return text;
             const chars = text.split('');
@@ -440,53 +422,36 @@
             return html;
         }
 
-        // DOM 元素參考
-        const cardContainer = document.getElementById('card-container');
-        const cardInner = document.getElementById('card-inner');
-        const emptyState = document.getElementById('empty-state');
-        const controlsContainer = document.getElementById('controls-container');
-        
-        const frontIdiomText = document.getElementById('card-idiom');
-        const backIdiomText = document.getElementById('card-idiom-back');
-        const meaningText = document.getElementById('card-meaning');
-        const synonymsText = document.getElementById('card-synonyms');
-        const antonymsText = document.getElementById('card-antonyms');
-        
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        
-        const learnedList = document.getElementById('learned-list');
-        const learnedEmptyMsg = document.getElementById('learned-empty-msg');
-        const learnedCountBadge = document.getElementById('learned-count-badge');
-
         function initAudio() {
-            if (!isAudioInitialized) {
-                // 單音合成器 (用於普通按鈕)
-                toneSynth = new Tone.MembraneSynth({
-                    pitchDecay: 0.05,
-                    octaves: 4,
-                    oscillator: { type: "sine" },
-                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.8 }
-                }).toDestination();
-                toneSynth.volume.value = -12; 
+            if (!isAudioInitialized && window.Tone) {
+                try {
+                    toneSynth = new Tone.MembraneSynth({
+                        pitchDecay: 0.05,
+                        octaves: 4,
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.8 }
+                    }).toDestination();
+                    toneSynth.volume.value = -12; 
 
-                // 和弦合成器 (用於「學會了」過關音效)
-                polySynth = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "triangle" },
-                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 1 }
-                }).toDestination();
-                polySynth.volume.value = -10;
+                    polySynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 1 }
+                    }).toDestination();
+                    polySynth.volume.value = -10;
 
-                isAudioInitialized = true;
+                    isAudioInitialized = true;
+                } catch(e) { console.log(e); }
             }
         }
 
         function playPopSound(high = false) {
+            initAudio();
             if (!isAudioInitialized) return;
             try { toneSynth.triggerAttackRelease(high ? "C5" : "G4", "8n"); } catch(e) {}
         }
 
         function playFlipSound() {
+            initAudio();
             if (!isAudioInitialized) return;
             try {
                 let osc = new Tone.Oscillator(400, "sine").toDestination();
@@ -496,216 +461,59 @@
         }
 
         function playSuccessSound() {
+            initAudio();
             if (!isAudioInitialized) return;
             try {
-                // 播放一個開心的琶音和弦
                 const now = Tone.now();
                 polySynth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now);
                 polySynth.triggerAttackRelease(["C5"], "4n", now + 0.15);
             } catch(e) {}
         }
 
-        function updateCardDisplay() {
-            // 檢查是否已全部學完
-            if (unlearnedIdioms.length === 0) {
-                cardContainer.style.display = 'none';
-                controlsContainer.style.display = 'none';
-                emptyState.classList.remove('hidden');
-                emptyState.classList.add('flex');
-                updateProgress();
-                return;
-            }
-
-            // 確保索引在安全範圍
-            if (currentIndex >= unlearnedIdioms.length) {
-                currentIndex = 0;
-            } else if (currentIndex < 0) {
-                currentIndex = unlearnedIdioms.length - 1;
-            }
-
-            const data = unlearnedIdioms[currentIndex];
-            
-            // 更新文字內容 (包含注音 HTML)
-            frontIdiomText.innerHTML = renderZhuyinHTML(data.i, data.z);
-            backIdiomText.innerHTML = renderZhuyinHTML(data.i, data.z);
-            
-            meaningText.textContent = data.m;
-            synonymsText.textContent = data.s;
-            antonymsText.textContent = data.a;
-            
-            updateProgress();
-            
-            // 確保切換時是正面
-            if (isFlipped) {
-                isFlipped = false;
-                cardInner.classList.remove('flipped');
-            }
-        }
-
-        function updateProgress() {
-            const total = allIdiomsData.length;
-            const learnedCount = learnedIdioms.length;
-            
-            progressText.textContent = `已學習進度: ${learnedCount} / ${total}`;
-            const progressPercent = (learnedCount / total) * 100;
-            progressBar.style.width = `${progressPercent}%`;
-            
-            learnedCountBadge.textContent = `${learnedCount} 顆星`;
-        }
-
-        function toggleFlip(event) {
-            // 如果有點擊事件，阻止冒泡以免重複觸發
-            if(event) event.stopPropagation(); 
-            initAudio(); 
-            playFlipSound();
-            isFlipped = !isFlipped;
-            if (isFlipped) {
-                cardInner.classList.add('flipped');
-            } else {
-                cardInner.classList.remove('flipped');
-            }
-        }
-
-        function nextCard() {
-            if(unlearnedIdioms.length === 0) return;
-            initAudio();
-            playPopSound(true);
-            currentIndex++;
-            handleTransitionUpdate();
-        }
-
-        function prevCard() {
-            if(unlearnedIdioms.length === 0) return;
-            initAudio();
-            playPopSound(false);
-            currentIndex--;
-            handleTransitionUpdate();
-        }
-
-        function handleTransitionUpdate() {
-            if(isFlipped) {
-                isFlipped = false;
-                cardInner.classList.remove('flipped');
-                setTimeout(updateCardDisplay, 250);
-            } else {
-                updateCardDisplay();
-            }
-        }
-
-        function markAsLearned() {
-            if (unlearnedIdioms.length === 0) return;
-            initAudio();
-            playSuccessSound();
-            
-            // 取得目前的成語
-            const learnedItem = unlearnedIdioms[currentIndex];
-            
-            // 加入已學習陣列
-            learnedIdioms.push(learnedItem);
-            
-            // 從未學習陣列移除
-            unlearnedIdioms.splice(currentIndex, 1);
-            
-            // 更新右側「已解鎖成就區」的 UI
-            renderLearnedBadge(learnedItem);
-            
-            // 隱藏空狀態提示
-            if(learnedEmptyMsg) {
-                learnedEmptyMsg.style.display = 'none';
-            }
-
-            // 更新左側卡片
-            handleTransitionUpdate();
-            
-            if (window.saveProgressToCloud) {
-                window.saveProgressToCloud(learnedIdioms);
-            }
-        }
-
-        function renderLearnedBadge(item) {
-            const badge = document.createElement('div');
-            // 使用 Tailwnid 建立可愛的徽章標籤
-            badge.className = "animate-pop-in bg-white text-orange-600 font-bold px-4 py-2 rounded-xl shadow-[0_3px_0_rgba(251,146,60,0.5)] border-2 border-orange-100 flex items-center gap-1 cursor-help";
-            
-            // 在標籤上也顯示注音
-            const badgeHTML = renderZhuyinHTML(item.i, item.z);
-            badge.innerHTML = `✅ <span class="tracking-widest">${badgeHTML}</span>`;
-            
-            // 加入簡單的點擊提示功能 (原生 Title 屬性)
-            badge.title = `${item.m}\n同義：${item.s}\n反義：${item.a}`;
-            
-            // 加入點擊發音
-            badge.onclick = () => {
-                initAudio();
-                playPopSound(true);
-                readTextAloud(item.i);
-            };
-
-            learnedList.appendChild(badge);
-        }
-
-        function playIdiomAudio(event) {
-            event.stopPropagation(); // 阻止卡片翻面
-            initAudio();
-            playPopSound(true);
-            
-            if(unlearnedIdioms.length > 0) {
-                readTextAloud(unlearnedIdioms[currentIndex].i);
-            }
-        }
-
-        function playMeaningAudio(event) {
-            event.stopPropagation(); // 阻止卡片翻面
-            initAudio();
-            playPopSound(true);
-            
-            if(unlearnedIdioms.length > 0) {
-                const item = unlearnedIdioms[currentIndex];
-                // 組合朗讀文字，讓語意更順暢，並包含同義詞與反義詞
-                const textToRead = `${item.i}的解釋是：${item.m}。同義詞有：${item.s}。反義詞有：${item.a}。`;
-                readTextAloud(textToRead);
-            }
-        }
-
         function readTextAloud(text) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // 中斷正在唸的
-                
+                window.speechSynthesis.cancel(); 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'zh-TW';
-                utterance.rate = 0.8; // 稍微放慢
-                utterance.pitch = 1.2; // 稍微提高音調
-                
+                utterance.rate = 0.8;
+                utterance.pitch = 1.2;
                 window.speechSynthesis.speak(utterance);
-            } else {
-                console.log("此瀏覽器不支援語音朗讀");
             }
         }
 
-        function resetAll() {
-            unlearnedIdioms = [...allIdiomsData];
-            learnedIdioms = [];
-            currentIndex = 0;
-            
-            // 重置 UI
-            learnedList.innerHTML = '';
-            learnedList.appendChild(learnedEmptyMsg);
-            learnedEmptyMsg.style.display = 'block';
-            
-            cardContainer.style.display = 'block';
-            controlsContainer.style.display = 'flex';
-            emptyState.classList.add('hidden');
-            emptyState.classList.remove('flex');
-            
-            updateCardDisplay();
-            
-            if (window.saveProgressToCloud) {
-                window.saveProgressToCloud([]);
+        async function loadProgressFromCloud() {
+            if (!isFirebaseReady || !userId) return false;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.learned && Array.isArray(data.learned)) {
+                        applyProgress(data.learned);
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.error("載入進度失敗:", e);
+            }
+            return false;
+        }
+
+        async function saveProgressToCloud() {
+            if (!isFirebaseReady || !userId) return;
+            showSync(true);
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                const learnedKeys = learnedIdioms.map(item => item.i);
+                await setDoc(docRef, { learned: learnedKeys });
+                showSync(false);
+            } catch (e) {
+                console.error("儲存進度失敗:", e);
+                showSync(false);
             }
         }
 
-        window.restoreProgress = function(learnedKeys) {
-            // 根據讀取的資料重置陣列
+        function applyProgress(learnedKeys) {
             unlearnedIdioms = [];
             learnedIdioms = [];
             learnedList.innerHTML = '';
@@ -725,30 +533,183 @@
             }
             
             currentIndex = 0;
+            updateCardDisplay();
+        }
+
+        function updateCardDisplay() {
+            if (unlearnedIdioms.length === 0) {
+                cardContainer.style.display = 'none';
+                controlsContainer.style.display = 'none';
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                updateProgress();
+                return;
+            }
+
+            if (currentIndex >= unlearnedIdioms.length) currentIndex = 0;
+            else if (currentIndex < 0) currentIndex = unlearnedIdioms.length - 1;
+
+            const data = unlearnedIdioms[currentIndex];
+            
+            frontIdiomText.innerHTML = renderZhuyinHTML(data.i, data.z);
+            backIdiomText.innerHTML = renderZhuyinHTML(data.i, data.z);
+            meaningText.textContent = data.m;
+            synonymsText.textContent = data.s;
+            antonymsText.textContent = data.a;
+            
+            updateProgress();
+            
+            if (isFlipped) {
+                isFlipped = false;
+                cardInner.classList.remove('flipped');
+            }
+        }
+
+        function updateProgress() {
+            const total = allIdiomsData.length;
+            const learnedCount = learnedIdioms.length;
+            progressText.textContent = `已學習: ${learnedCount} / ${total}`;
+            const progressPercent = (learnedCount / total) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            learnedCountBadge.textContent = `${learnedCount} 顆星`;
+        }
+
+        // Global functions mapped to window for HTML handlers
+        window.toggleFlip = function(event) {
+            if(event) event.stopPropagation(); 
+            playFlipSound();
+            isFlipped = !isFlipped;
+            if (isFlipped) cardInner.classList.add('flipped');
+            else cardInner.classList.remove('flipped');
         };
 
-        // 初始載入
-        window.onload = async () => {
-            if (window.initCloudStorage) {
-                await window.initCloudStorage();
+        window.nextCard = function() {
+            if(unlearnedIdioms.length === 0) return;
+            playPopSound(true);
+            currentIndex++;
+            handleTransitionUpdate();
+        };
+
+        window.prevCard = function() {
+            if(unlearnedIdioms.length === 0) return;
+            playPopSound(false);
+            currentIndex--;
+            handleTransitionUpdate();
+        };
+
+        function handleTransitionUpdate() {
+            if(isFlipped) {
+                isFlipped = false;
+                cardInner.classList.remove('flipped');
+                setTimeout(updateCardDisplay, 250);
+            } else {
+                updateCardDisplay();
             }
+        }
+
+        window.markAsLearned = async function() {
+            if (unlearnedIdioms.length === 0) return;
+            playSuccessSound();
+            
+            const learnedItem = unlearnedIdioms[currentIndex];
+            learnedIdioms.push(learnedItem);
+            unlearnedIdioms.splice(currentIndex, 1);
+            
+            renderLearnedBadge(learnedItem);
+            
+            if(learnedEmptyMsg) {
+                learnedEmptyMsg.style.display = 'none';
+            }
+
+            handleTransitionUpdate();
+            
+            await saveProgressToCloud(); // Await saving
+        };
+
+        function renderLearnedBadge(item) {
+            const badge = document.createElement('div');
+            badge.className = "animate-pop-in bg-white text-orange-600 font-bold px-4 py-2 rounded-xl shadow-[0_3px_0_rgba(251,146,60,0.5)] border-2 border-orange-100 flex items-center gap-1 cursor-help";
+            badge.innerHTML = `✅ <span class="tracking-widest">${renderZhuyinHTML(item.i, item.z)}</span>`;
+            badge.title = `${item.m}\n同義：${item.s}\n反義：${item.a}`;
+            badge.onclick = () => {
+                playPopSound(true);
+                readTextAloud(item.i);
+            };
+            learnedList.appendChild(badge);
+        }
+
+        window.playIdiomAudio = function(event) {
+            event.stopPropagation();
+            playPopSound(true);
+            if(unlearnedIdioms.length > 0) {
+                readTextAloud(unlearnedIdioms[currentIndex].i);
+            }
+        };
+
+        window.playMeaningAudio = function(event) {
+            event.stopPropagation();
+            playPopSound(true);
+            if(unlearnedIdioms.length > 0) {
+                const item = unlearnedIdioms[currentIndex];
+                const textToRead = `${item.i}的解釋是：${item.m}。同義詞有：${item.s}。反義詞有：${item.a}。`;
+                readTextAloud(textToRead);
+            }
+        };
+
+        window.resetAll = async function() {
+            unlearnedIdioms = [...allIdiomsData];
+            learnedIdioms = [];
+            currentIndex = 0;
+            
+            learnedList.innerHTML = '';
+            learnedList.appendChild(learnedEmptyMsg);
+            learnedEmptyMsg.style.display = 'block';
+            
+            cardContainer.style.display = 'block';
+            controlsContainer.style.display = 'flex';
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
             
             updateCardDisplay();
+            await saveProgressToCloud();
+        };
+
+        async function initializeAppLogic() {
+            if (isFirebaseReady) {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    userId = auth.currentUser?.uid;
+                    
+                    if (userId) {
+                        await loadProgressFromCloud();
+                    }
+                } catch(e) {
+                    console.error("登入/載入進度失敗:", e);
+                }
+            }
             
-            // 鍵盤快速鍵支援
+            // 確保 UI 顯示最新狀態
+            updateCardDisplay();
+            
             document.addEventListener('keydown', (e) => {
-                // 如果已經學完，就不需要鍵盤操作卡片
                 if(unlearnedIdioms.length === 0) return;
                 
-                if (e.key === 'ArrowRight') nextCard();
-                if (e.key === 'ArrowLeft') prevCard();
-                // 空白鍵或 Enter 翻面 (避免在其他聚焦元素上觸發)
+                if (e.key === 'ArrowRight') window.nextCard();
+                if (e.key === 'ArrowLeft') window.prevCard();
                 if (e.key === ' ' && e.target === document.body) {
                     e.preventDefault();
-                    toggleFlip();
+                    window.toggleFlip();
                 }
             });
-        };
+        }
+
+        // 當模組載入完畢即執行初始化
+        initializeAppLogic();
+
     </script>
 </body>
 </html>
