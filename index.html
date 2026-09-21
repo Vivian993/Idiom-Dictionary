@@ -237,6 +237,79 @@
 
     </div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 環境參數與變數宣告
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        let app, auth, db, userId;
+        
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Firebase初始化失敗:", e);
+        }
+
+        // 初始化登入狀態與載入進度
+        window.initCloudStorage = async function() {
+            if (!auth) return false;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid;
+                if(userId) {
+                    await loadProgress();
+                    return true;
+                }
+                return false;
+            } catch(e) {
+                console.error("登入失敗:", e);
+                return false;
+            }
+        };
+
+        // 儲存進度到雲端
+        window.saveProgressToCloud = async function(learnedArray) {
+            if (!db || !userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                // 將物件陣列轉為純文字陣列(成語名稱)儲存
+                const learnedKeys = learnedArray.map(item => item.i);
+                await setDoc(docRef, { learned: learnedKeys });
+            } catch (e) {
+                console.error("儲存進度失敗:", e);
+            }
+        };
+
+        // 讀取雲端進度
+        async function loadProgress() {
+            if (!db || !userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'progress', 'idioms');
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.learned && Array.isArray(data.learned)) {
+                        if (window.restoreProgress) {
+                            window.restoreProgress(data.learned);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("載入進度失敗:", e);
+            }
+        }
+    </script>
+
     <script>
         // 原始成語資料庫 (修正了錯別字，並加入注音 z)
         const allIdiomsData = [
@@ -543,6 +616,10 @@
 
             // 更新左側卡片
             handleTransitionUpdate();
+            
+            if (window.saveProgressToCloud) {
+                window.saveProgressToCloud(learnedIdioms);
+            }
         }
 
         function renderLearnedBadge(item) {
@@ -621,10 +698,41 @@
             emptyState.classList.remove('flex');
             
             updateCardDisplay();
+            
+            if (window.saveProgressToCloud) {
+                window.saveProgressToCloud([]);
+            }
         }
 
+        window.restoreProgress = function(learnedKeys) {
+            // 根據讀取的資料重置陣列
+            unlearnedIdioms = [];
+            learnedIdioms = [];
+            learnedList.innerHTML = '';
+            learnedList.appendChild(learnedEmptyMsg);
+            
+            allIdiomsData.forEach(item => {
+                if (learnedKeys.includes(item.i)) {
+                    learnedIdioms.push(item);
+                    renderLearnedBadge(item);
+                } else {
+                    unlearnedIdioms.push(item);
+                }
+            });
+            
+            if (learnedIdioms.length > 0 && learnedEmptyMsg) {
+                learnedEmptyMsg.style.display = 'none';
+            }
+            
+            currentIndex = 0;
+        };
+
         // 初始載入
-        window.onload = () => {
+        window.onload = async () => {
+            if (window.initCloudStorage) {
+                await window.initCloudStorage();
+            }
+            
             updateCardDisplay();
             
             // 鍵盤快速鍵支援
